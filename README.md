@@ -15,9 +15,7 @@ When a market trends sustainably, its price patterns become highly structured, d
 **The Formula:**
 We calculate the Weighted Permutation Entropy ($H_{WPE}$) to capture both structural sequential patterns and amplitude variations:
 
-$$
-H_{WPE} = - \frac{1}{\ln(d!)} \sum_{i=1}^{d!} p^{(w)}_i \ln(p^{(w)}_i)
-$$
+$$H_{WPE} = - \frac{1}{\ln(d!)} \sum_{i=1}^{d!} p^{(w)}_i \ln(p^{(w)}_i)$$
 
 Where:
 - $d$ represents the **embedding dimension** (e.g., $d=3$), determining the length of the ordinal patterns extracted.
@@ -33,8 +31,10 @@ The Cross-Sectional Entropy measures whether capital is flowing in a centralized
 
 ### Market Volatility (Ann. Std)
 - **Definition:** The Annualized Standard Deviation of Log-Returns.
-- **Formula:** 
-  $$ \sigma_{ann} = \sigma_{daily} \times \sqrt{252} $$
+- **Formula:**
+
+$$\sigma_{ann} = \sigma_{daily} \cdot \sqrt{252}$$
+
 - **Significance:** Measures the magnitude of price action and systemic turbulence. 
 
 ### GMM Clustering (The DS Core)
