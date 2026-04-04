@@ -95,6 +95,11 @@ Where $C_{JS}$ is the Jensen-Shannon Statistical Complexity -- a measure of the 
 the observed ordinal distribution and a uniform (maximum entropy) distribution. High MFI indicates
 simultaneously high disorder and low complexity, the signature of structural fragility.
 
+> *Note: While the theoretical 2D Complexity-Entropy Causality Plane (CECP) boundaries are not
+> visualized on the dashboard (which prioritizes Volatility for Plane 1), MFI serves as a 1D
+> dimensional reduction of that space. It successfully embeds the structural complexity ($C_{JS}$)
+> into a single actionable metric.*
+
 ### 2.3 Kinematic Physics Vectors -- Plane 1
 
 Beyond the static entropy value, the system computes the **first and second derivatives** of
@@ -208,7 +213,7 @@ discover hidden market regimes without human-labeled bias.
 
 ### 3.2 Volume Regime Classification (Plane 2)
 
-| Features | $[\text{Vol\_Shannon}, \text{Vol\_SampEn}]$ |
+| Features | $[\text{Vol}_{\text{Shannon}}, \text{Vol}_{\text{SampEn}}]$ |
 |---|---|
 | **Preprocessing** | `StandardScaler` |
 | **Label Mapping** | Sort clusters by **sum of centroid coordinates** (Shannon + SampEn) |
