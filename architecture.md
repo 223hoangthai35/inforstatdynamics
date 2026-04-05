@@ -7,36 +7,57 @@
 ## 1. Architecture Overview -- Dual-Plane Engine
 
 ```text
-+-------------------------------------------------+
-|             agent_orchestrator.py               |
-|         Cross-Plane Reasoning Engine            |
-|       (Macro-Micro Fusion & ReAct Loop)         |
-+-------------------------------------------------+
-         /                |                \
-+-------------+   +---------------+   +---------------+
-| data_skill  |   |  quant_skill  |   |   ds_skill    |
-+-------------+   +---------------+   +---------------+
-| Market Data |   | PE, V, a (P1) |   | GMM Clusters  |
-| VN30 fetch  |   | Vol Pipeline  |   | Regime Map    |
-+-------------+   +-------+-------+   +---------------+
-          |               |                   |
-          |       [PLANE 1: PRICE]     [PLANE 2: VOLUME]
-          |       Physics Dynamics     Macro-Micro Fusion
-          |               |            /             \
-          v               v           v               v
-    [Index Data]    [WPE, V, a]   [Macro Z]   [Rolling Z + Ent]
-          |               |           |               |
-          |               |           |               |
-    +=====v===============v===+   +===v===============v=====+
-    |         PLANE 1         |   |         PLANE 2         |
-    |     Price Dynamics      |   |     Liquidity Space     |
-    +=========================+   +=========================+
-                  \                         /
-                   \                       /
-             +=============================+
-             |    CROSS-PLANE SYNTHESIS    |
-             | (Price Chaos + Liquidity F.) |
-             +=============================+
+                           +---------------------------------------+
+                           |         agent_orchestrator.py         |
+                           |    (Anthropic Claude ReAct Loop)      |
+                           +---------------------------------------+
+                                              |
+                                       [1] Fetch Data
+                                              v
+                           +---------------------------------------+
+                           |              data_skill               |
+                           |          (VN-Index OHLCV Data)        |
+                           +---------------------------------------+
+                                              |
+                     +---------------------------------------------------+
+                     |                                                   |
+             [2] Compute Price Entropy                           [3] Compute Volume Entropy
+                     |                                                   |
+                     v                                                   v
+   +---------------------------------------+           +---------------------------------------+
+   |              quant_skill              |           |              quant_skill              |
+   |              (PLANE 1)                |           |              (PLANE 2)                |
+   |---------------------------------------|           |---------------------------------------|
+   | - WPE, C, MFI                         |           | - Volume Entropy: Shannon, SampEn     |
+   | - Kinematics: V, a (Bypass GMM)       |           | - Macro Path: Global Z (Bypass GMM)   |
+   +---------------------------------------+           +---------------------------------------+
+             |                     |                             |                     |
+     [WPE, C, MFI]          [Kinematics (V, a)]          [Shannon, SampEn]      [Macro Z]
+             |                     |                             |                     |
+   [4] Predict Price Regime        |                   [5] Predict Vol Regime          |
+             |                     |                             |                     |
+             v                     |                             v                     |
+   +-------------------+           |                   +-------------------+           |
+   |     ds_skill      |           |                   |     ds_skill      |           |
+   |     (PLANE 1)     |           |                   |     (PLANE 2)     |           |
+   |-------------------|           |                   |-------------------|           |
+   | GMM Classifier    |           |                   | Volume GMM        |           |
+   | - Stable Growth   |           |                   | - Consensus Flow  |           |
+   | - Fragile Growth  |           |                   | - Dispersed Flow  |           |
+   | - Chaos / Panic   |           |                   | - Erratic / Noisy |           |
+   +-------------------+           |                   +-------------------+           |
+             |                     |                             |                     |
+             +---------------------+--------------+--------------+---------------------+
+                                                  |
+                                        [6] Cross-Plane Synthesis
+                                                  v
+                           +---------------------------------------+
+                           |    Cross-Plane Logic (Orchestrator)   |
+                           |---------------------------------------|
+                           | GMM Labels + Kinematics + Macro Z     |
+                           | e.g. Chaos + Erratic Flow + High Z    |
+                           |      => CLIMAX DISTRIBUTION           |
+                           +---------------------------------------+
 ```
 
 ### Dual-Plane Definitions
@@ -44,7 +65,7 @@
 | Plane | X-Axis | Y-Axis | Measurement | Purpose |
 |---|---|---|---|---|
 | **Plane 1: Price Dynamics** | Weighted Permutation Entropy (WPE) | Annualized Volatility | "Physical Chaos" + Kinematic Vectors (V, a) | Measures the degree of structural disorder in price dynamics. WPE evaluates the randomness of ordinal patterns; Volatility quantifies amplitude fluctuations. V = dE/dt (direction), a = d²E/dt² (momentum force). |
-| **Plane 2: Liquidity Structure (Macro-Micro Fusion)** | Volume Shannon Entropy | Volume Sample Entropy | Macro-Micro Liquidity Status | Measures the structural integrity of capital flow using a dual-path architecture. The Macro component utilizes a Global Z-Score to evaluate absolute systemic liquidity. The Micro component applies a 252-day Rolling Z-Score before entropy computation to isolate localized structural regimes (Consensus vs. Erratic) while neutralizing structural break biases. |
+| **Plane 2: Micro Liquidity Structure** | Volume Shannon Entropy | Volume Sample Entropy | Micro-Structural Liquidity Status | Measures the localized structural integrity of capital flow. The Plane 2 GMM exclusively evaluates the Micro component (utilizing a 252-day Rolling Z-Score before entropy computation to isolate local regimes like Consensus vs. Erratic, neutralizing structural breaks). The Macro component (Global Z-Score) bypasses this GMM plane entirely for later Agent synthesis. |
 
 ### Agent Role: Cross-Plane Reasoning Engine
 
@@ -110,7 +131,7 @@ The Agent does not simply analyze each plane in isolation; it performs a **cross
 
 **Handling NaNs**: Computed as `fillna(0)` to maintain JSON serialization and prevent GMM clustering destabilization.
 
-#### 3.2.2 Plane 2: Volume Entropy (Macro-Micro Fusion)
+#### 3.2.2 Volume Entropy Pipeline (Macro-Micro Generation)
 
 | Function | Input | Output | Notes |
 |---|---|---|---|
@@ -122,7 +143,7 @@ The Agent does not simply analyze each plane in isolation; it performs a **cross
 **Parameter Justification**:
 - `bins='auto'`: Logarithmic volume distributions inherently possess heavy tails. Static bin constraints create empty subsets. The Freedman-Diaconis rule dynamically calibrates subset dispersion iteratively.
 - `window=60`: SampEn with $m=2$ ideally requires $N \geq 10^m = 100$. A 60-day window is the minimal viable baseline balancing statistical convergence with practical regime responsiveness.
-- **Macro-Micro Architecture**: Follows `log1p(volume)` transformation. Path A utilizes a Global Z-Score for absolute macro-scale systemic assessment. Path B computes a 252-day Rolling Z-score to eliminate structural break contamination. Entropy components (Shannon, SampEn) execute exclusively on Path B. SampEn tolerance $r$ revolves strictly at $0.2 \sigma$ since the rolling z-score vector already maintains unit variance.
+- **Macro-Micro Architecture**: Follows `log1p(volume)` transformation. Path A utilizes a Global Z-Score for absolute macro-scale systemic assessment, **deliberately bypassing the Volume GMM** to feed directly into the Agent orchestrator. Path B computes a 252-day Rolling Z-score to eliminate structural break contamination. Entropy components (Shannon, SampEn) execute exclusively on Path B. SampEn tolerance $r$ revolves strictly at $0.2 \sigma$ since the rolling z-score vector already maintains unit variance.
 
 #### 3.2.3 Cross-Sectional Correlation Entropy (VN30)
 
@@ -138,16 +159,22 @@ The Agent does not simply analyze each plane in isolation; it performs a **cross
 
 #### 3.3.1 Price Regime (Plane 1)
 
+> **Important Bypass Logic**: The Price GMM Classifier trains exclusively on the static structural entropy state `[WPE, C_JS, MFI]`. The dynamic **Kinematic Vectors (V, a)** bypass the GMM entirely and are routed directly to the Orchestrator to validate momentum context.
+
 | Component | Description |
 |---|---|
+| `Features` | `[WPE_Price, Complexity_Price, MFI_Price]` |
 | `REGIME_NAMES` | `{0: "Stable Growth", 1: "Fragile Growth", 2: "Chaos/Panic"}` |
 | `RegimeClassifier` | GMM `n_components=3`, `covariance_type='full'`. Mapping rule: Sorting executed sequentially by mean algorithmic feature value. |
 | `fit_predict_regime(features)` | Functional API resolving -> `(labels, classifier)` |
 
 #### 3.3.2 Volume Regime (Plane 2)
 
+> **Important Bypass Logic**: The Volume GMM Classifier is trained exclusively on the localized micro-structural entropy `[Vol_Shannon, Vol_SampEn]`. The **Macro Global Z-Score** bypasses the GMM entirely and is routed directly to the Orchestrator to validate absolute systemic scale.
+
 | Component | Description |
 |---|---|
+| `Features` | `[Vol_Shannon, Vol_SampEn]` |
 | `VOLUME_REGIME_NAMES` | `{0: "Consensus Flow", 1: "Dispersed Flow", 2: "Erratic/Noisy Flow"}` |
 | `VolumeRegimeClassifier` | GMM `n_components=3`, `covariance_type='full'`. Mapping rule: Sorted recursively against sum(Shannon + SampEn). Lowest combined entropy translates to Consensus, while highest indicates Erratic variance. |
 | `fit_predict_volume_regime(features)` | Functional API resolving -> `(labels, classifier)` |
@@ -209,13 +236,15 @@ def _cross_plane_synthesis(price_regime: str, volume_regime: str) -> tuple[str, 
   PE Velocity (V) : +0.0312 (chaos expanding)
   PE Accel (a)    : -0.0045 (momentum fading)
 
-  PLANE 2 -- LIQUIDITY STRUCTURE (MACRO-MICRO FUSION)
+  PLANE 2 -- MICRO LIQUIDITY STRUCTURE
   MICRO REGIME    : [CONSENSUS FLOW]
-  Macro Z (Global): -0.45
   Vol Shannon     : 0.8234
   Vol SampEn      : 1.4521
 
-  CROSS-PLANE SYNTHESIS
+  MACRO CONTEXT (BYPASS)
+  Macro Z (Global): -0.45
+
+  CROSS-PLANE SYNTHESIS (MACRO-MICRO FUSION)
   CONCLUSION      : [STRUCTURAL ACCUMULATION]
   SYSTEMIC RISK   : [MODERATE]
 
