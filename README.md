@@ -1,373 +1,182 @@
-# Financial Entropy Agent: Dual-Plane Systemic Risk Engine
+# Financial Entropy Agent
+
+### A Tri-Vector Kinematic Surveillance System for Systemic Risk Quantification
+
+---
 
 ## Abstract
 
-The **Financial Entropy Agent** is a Multi-Modal Systemic Risk Engine that monitors financial
-market structural integrity through two independent, unsupervised observation planes. Moving beyond
-single-variable forecasting or lagging technical indicators, this system employs concepts from
-**Symbolic Dynamics**, **Information Theory**, and **Non-linear Physics** to decouple market noise
-from intrinsic structural regimes.
+**Financial Entropy Agent** is an institutional-grade systemic risk surveillance engine that decodes market microstructure through the principles of **Symbolic Dynamics**, **Information Theory**, and **Non-linear Physics**. The system replaces all heuristic-based Technical Analysis (TA) with continuous, mathematically rigorous models rooted in statistical mechanics.
 
-The architecture observes the market through two lenses simultaneously:
-
-- **Plane 1 -- Price Dynamics**: Measures the *physical chaos* of price action via Weighted
-  Permutation Entropy and Annualized Volatility.
-- **Plane 2 -- Micro Liquidity Structure**: Evaluates localized micro-structural trading behavior (Consensus vs. Erratic flow) using **Rolling Z-Scores + Entropy** to neutralize structural break bias. *(Note: The Macro path via Global Z-Scores evaluates absolute systemic liquidity and bypasses this plane, feeding directly into the final Cross-Plane Synthesis).*
-
-An autonomous AI Agent (Anthropic Claude) acts as the **Cross-Plane Reasoning Engine**, synthesizing
-both planes to identify systemic conditions that are invisible from a single observation space --
-such as Smart Money accumulation masked by price chaos, or trend exhaustion hidden beneath stable
-prices.
+The core innovation is the **Standardized Entropy Shock Space** -- a power-transformed phase space where a tied-covariance Gaussian Mixture Model (GMM) performs topological slicing along the WPE Shock axis, partitioning the market into structural regimes (Stable, Fragile, Chaos) without any human-imposed boundary constraints.
 
 ---
 
-## 1. Architecture Overview
+## Core Philosophy: The Paradigm Shift
 
-```text
-                           +---------------------------------------+
-                           |         agent_orchestrator.py         |
-                           |    (Anthropic Claude ReAct Loop)      |
-                           +---------------------------------------+
-                                              |
-                                       [1] Fetch Data
-                                              v
-                           +---------------------------------------+
-                           |              data_skill               |
-                           |          (VN-Index OHLCV Data)        |
-                           +---------------------------------------+
-                                              |
-                     +---------------------------------------------------+
-                     |                                                   |
-             [2] Compute Price Entropy                           [3] Compute Volume Entropy
-                     |                                                   |
-                     v                                                   v
-   +---------------------------------------+           +---------------------------------------+
-   |              quant_skill              |           |              quant_skill              |
-   |              (PLANE 1)                |           |              (PLANE 2)                |
-   |---------------------------------------|           |---------------------------------------|
-   | - WPE, C, MFI                         |           | - Volume Entropy: Shannon, SampEn     |
-   | - Kinematics: V, a (Bypass GMM)       |           | - Macro Path: Global Z (Bypass GMM)   |
-   +---------------------------------------+           +---------------------------------------+
-             |                     |                             |                     |
-     [WPE, C, MFI]          [Kinematics (V, a)]          [Shannon, SampEn]      [Macro Z]
-             |                     |                             |                     |
-   [4] Predict Price Regime        |                   [5] Predict Vol Regime          |
-             |                     |                             |                     |
-             v                     |                             v                     |
-   +-------------------+           |                   +-------------------+           |
-   |     ds_skill      |           |                   |     ds_skill      |           |
-   |     (PLANE 1)     |           |                   |     (PLANE 2)     |           |
-   |-------------------|           |                   |-------------------|           |
-   | GMM Classifier    |           |                   | Volume GMM        |           |
-   | - Stable Growth   |           |                   | - Consensus Flow  |           |
-   | - Fragile Growth  |           |                   | - Dispersed Flow  |           |
-   | - Chaos / Panic   |           |                   | - Erratic / Noisy |           |
-   +-------------------+           |                   +-------------------+           |
-             |                     |                             |                     |
-             +---------------------+--------------+--------------+---------------------+
-                                                  |
-                                        [6] Cross-Plane Synthesis
-                                                  v
-                           +---------------------------------------+
-                           |    Cross-Plane Logic (Orchestrator)   |
-                           |---------------------------------------|
-                           | GMM Labels + Kinematics + Macro Z     |
-                           | e.g. Chaos + Erratic Flow + High Z    |
-                           |      => CLIMAX DISTRIBUTION           |
-                           +---------------------------------------+
-```
+Traditional financial analysis relies on pattern-matching heuristics: moving averages, RSI thresholds, support/resistance levels. These tools assume stationarity and normality in price series -- assumptions that are systematically violated by real markets.
 
-> **Volume Entropy Pipeline (Macro-Micro Generation):** The volume pipeline utilizes a dual-path preprocessing architecture.
-> Raw volume is `log1p`-transformed, then split into: **(A) Global Z-Score** for absolute
-> macro-scale measurement, which bypasses the GMM logic, and **(B) 252-day
-> Rolling Z-Score** which feeds the Shannon/SampEn entropy calculations for Plane 2. This isolates
-> localized trading behavior from long-term structural break biases.
+This system operates on a fundamentally different premise:
 
-
-| Observation Plane | X-Axis | Y-Axis | Measures |
-|---|---|---|---|
-| **Plane 1: Price Dynamics** | Weighted Permutation Entropy (WPE) | Annualized Volatility | Physical Chaos |
-| **Plane 2: Micro Liquidity Structure** | Volume Shannon Entropy | Volume Sample Entropy | Capital Flow Structure |
+| Dimension | Traditional TA | Financial Entropy Agent |
+|:---|:---|:---|
+| **Signal** | Price level, amplitude | Ordinal pattern entropy (WPE) |
+| **Dynamics** | Trend-following | Kinematic velocity and acceleration of entropy |
+| **Regime Detection** | Fixed thresholds | Unsupervised GMM in power-transformed space |
+| **Risk Scoring** | Rule-based if/else | Continuous composite index (0-100) |
+| **Normalization** | Z-score (assumes normality) | Yeo-Johnson PowerTransform (handles skew) |
+| **Threshold Calibration** | Expert guesses | Empirical quantiles (P75/P90) from rolling distribution |
 
 ---
 
-## 2. Mathematical Foundations and Hyperparameters
+## Key Features
 
-### 2.1 Weighted Permutation Entropy (WPE) -- Plane 1
+### 1. Standardized Entropy Shock Space
+Weighted Permutation Entropy (WPE) and its kinematic derivatives are projected into a Gaussian-normalized phase space via `PowerTransformer(yeo-johnson)`. A tied-covariance `GaussianMixture(n_components=3, covariance_type='tied')` performs topological slicing along the WPE Shock axis, partitioning the space into three structural regimes via centroid sorting -- no hardcoded thresholds, no human bias. The `tied` constraint forces all three clusters to share a single covariance matrix, preventing the EM algorithm from creating concentric (core-vs-periphery) topologies.
 
-Permutation Entropy measures the structural orderliness of a time series by analyzing the frequency
-distribution of **ordinal patterns** (rank sequences) within sliding windows. Unlike amplitude-based
-entropy measures, PE captures the *temporal order* of data points, making it fundamentally appropriate
-for non-stationary financial time series where absolute price levels are less informative than
-relative movements.
+### 2. Tri-Vector Composite Risk Index
+Systemic risk is quantified through three orthogonal measurement vectors:
+- **V1 -- Price Kinematics (40%)**: WPE magnitude + Momentum Entropy Flux direction.
+- **V2 -- Liquidity Depth (40%)**: Sample Entropy + Global Z-Score + Shannon Entropy of volume.
+- **V3 -- Structural Breadth (20%)**: Cross-Sectional Correlation Entropy (VN30 EVD) + Market Fragility Index.
 
-**Weighted Permutation Entropy** extends this by incorporating the variance (amplitude) of each
-pattern, preventing information loss from rank-only analysis:
+Each vector is independently power-transformed and min-max scaled to `[0, 1]` before weighted summation.
 
-$$H_{WPE} = -\frac{1}{\ln(d!)} \sum_{i=1}^{d!} p_i^{(w)} \ln\left(p_i^{(w)}\right)$$
+### 3. Dynamic Rolling Probability Thresholds
+Risk boundaries are not static. The system computes a rolling 504-day (2 trading years) distribution of composite scores and derives:
+- **P75**: Elevated risk threshold (top 25% historical scores).
+- **P90**: Critical risk threshold (top 10% extreme events).
 
-Where:
-- $d = 3$ -- Embedding dimension. Defines the length of ordinal patterns extracted from the time
-  series. $d = 3$ yields $3! = 6$ possible permutations, balancing granularity against statistical
-  reliability.
-- $\tau = 1$ -- Time delay between consecutive data points. Standard for daily granularity.
-- $p_i^{(w)}$ -- Variance-weighted frequency of the $i$-th ordinal pattern. Weights proportional
-  to the variance within each pattern window ensure that high-amplitude events contribute more to
-  the entropy estimate.
-- Rolling window: **22 trading days** (approximately 1 calendar month).
+This ensures the model adapts autonomously to evolving market regimes.
 
-**Interpretation**: $H_{WPE} \to 0$ implies deterministic, trending structure. $H_{WPE} \to 1$
-implies maximum disorder -- random, structureless price action.
-
-### 2.2 Market Fragility Index (MFI)
-
-The MFI combines entropy with statistical complexity to quantify how close the market is to a
-structurally fragile state:
-
-$$\text{MFI} = H_{WPE} \times (1 - C_{JS})$$
-
-Where $C_{JS}$ is the Jensen-Shannon Statistical Complexity -- a measure of the distance between
-the observed ordinal distribution and a uniform (maximum entropy) distribution. High MFI indicates
-simultaneously high disorder and low complexity, the signature of structural fragility.
-
-> *Note: While the theoretical 2D Complexity-Entropy Causality Plane (CECP) boundaries are not
-> visualized on the dashboard (which prioritizes Volatility for Plane 1), MFI serves as a 1D
-> dimensional reduction of that space. It successfully embeds the structural complexity ($C_{JS}$)
-> into a single actionable metric.*
-
-### 2.3 Kinematic Physics Vectors -- Plane 1
-
-Beyond the static entropy value, the system computes the **first and second derivatives** of
-Permutation Entropy to capture dynamic momentum -- analogous to velocity and acceleration in
-classical mechanics:
-
-$$V = \frac{dE}{dt} \approx \Delta_3 H_{WPE} = H_{WPE}(t) - H_{WPE}(t-3)$$
-
-$$a = \frac{d^2E}{dt^2} \approx \Delta_3 V = V(t) - V(t-3)$$
-
-| Vector | Formula | Interpretation |
-|---|---|---|
-| **V (Velocity)** | `WPE.diff(3)` | Direction of entropy change. $V > 0$: chaos expanding. $V < 0$: order forming. |
-| **a (Acceleration)** | `V.diff(3)` | Force of momentum. $a > 0$: trend accelerating (exploding). $a < 0$: momentum fading (exhausting). |
-
-**Why 3-day momentum**: A 1-day diff captures excessive noise from daily microstructure artifacts.
-A 3-day window filters noise while remaining responsive to genuine structural shifts. NaN values
-from the differencing operation are filled with `0` to prevent breaking downstream GMM clustering
-and JSON serialization.
-
-**Kinematic Heuristic Matrix**:
-
-| V | a | Interpretation |
-|---|---|---|
-| $V > 0$ | $a > 0$ | Chaos accelerating. Structural breakdown in progress. |
-| $V > 0$ | $a < 0$ | Chaos expanding but decelerating. Peak disorder may be near. |
-| $V < 0$ | $a < 0$ | Order forming and accelerating. Recovery gaining momentum. |
-| $V < 0$ | $a > 0$ | Order forming but decelerating. Recovery may stall. |
-
-### 2.4 Volume Sample Entropy (SampEn) -- Plane 2
-
-Sample Entropy quantifies the **regularity of volume impulse patterns**. It measures the conditional
-probability that two sequences of $m$ consecutive data points that are similar (within tolerance $r$)
-will remain similar when extended to $m+1$ points.
-
-$$\text{SampEn}(m, r, N) = -\ln\left(\frac{A}{B}\right)$$
-
-Where:
-- $A$ = Number of template matches for sequences of length $m+1$
-- $B$ = Number of template matches for sequences of length $m$
-
-**Hyperparameters and Justification**:
-
-| Parameter | Value | Justification |
-|---|---|---|
-| $m$ (Embedding Dimension) | **2** | Captures 2-day micro-structural patterns in volume impulses. Higher $m$ would require exponentially more data ($N \geq 10^m$) for convergence. |
-| $r$ (Tolerance) | **$0.2$** (fixed) | Since the input to SampEn is a **Rolling Z-Score** (unit variance by construction), the tolerance is fixed at $0.2$ standard deviations. This eliminates the need for adaptive `0.2 * std(x)` scaling. |
-| Window | **60 trading days** | Satisfies the convergence requirement $N \geq 10^m = 100$ at the practical minimum. 60 trading days (~3 calendar months) balances statistical reliability against responsiveness to regime shifts. |
-| Pre-processing | **Rolling Z-Score of $\log(1 + V)$** | Raw volume is first `log1p`-transformed to stabilize heavy tails, then converted to a 252-day Rolling Z-Score. This ensures entropy measures capture *relative structural behavior* rather than absolute magnitude, and resists contamination from long-term structural breaks. |
-
-**Interpretation**:
-- **Low SampEn**: Volume impulses are regular and predictable -- characteristic of institutional,
-  algorithmic flow (Consensus Flow).
-- **High SampEn**: Volume impulses are irregular and unpredictable -- characteristic of fragmented
-  retail activity or panic-driven trading (Erratic Flow).
-
-**Performance Note**: The $O(N^2)$ complexity of the template-matching algorithm necessitates
-`@numba.njit` JIT compilation for real-time dashboard responsiveness.
-
-### 2.5 Volume Shannon Entropy -- Plane 2
-
-Shannon Entropy measures the **concentration or dispersion** of volume distribution:
-
-$$H_{Shannon} = -\sum_{i=1}^{k} p_i \log_2(p_i) \quad \text{(normalized to [0, 1])}$$
-
-Where $p_i$ is the probability of volume falling in the $i$-th histogram bin.
-
-**Hyperparameters and Justification**:
-
-| Parameter | Value | Justification |
-|---|---|---|
-| Binning Strategy | **`bins='auto'`** | Delegates to NumPy's automatic bin selection (Freedman-Diaconis or Sturges rule). This is critical for financial volume data: hardcoded bins (e.g., `bins=10`) create numerous empty bins due to the heavy-tailed distribution, artificially deflating entropy. The Freedman-Diaconis rule adapts bin width based on the Interquartile Range, naturally handling outliers and volume spikes. |
-| Normalization | **$H / H_{max}$** | Divides by $\log_2(k)$ to normalize to $[0, 1]$ range, enabling cross-comparison regardless of the number of bins. |
-
-**Interpretation**:
-- **Low Shannon**: Volume is concentrated in a narrow range -- institutional, consensus-driven flow.
-- **High Shannon**: Volume is dispersed across many levels -- fragmented, multi-source activity.
-
-### 2.6 Cross-Sectional Correlation Entropy (VN30)
-
-Measures the structural fragmentation across the VN30 blue-chip basket:
-
-1. Compute the Pearson Correlation Matrix of VN30 component daily returns.
-2. Perform Eigenvalue Decomposition (EVD).
-3. Convert eigenvalues to a probability distribution and compute Shannon Entropy.
-4. Scale to $[0, 100]$.
-
-**Interpretation**: Low entropy = centralized capital consensus (blue chips move together).
-High entropy = extreme fragmentation (decorrelated sector rotation).
+### 4. Autonomous AI Orchestrator
+An Anthropic-powered ReAct agent autonomously sequences data retrieval, entropy computation, regime classification, and composite risk synthesis. The agent's reasoning is constrained to statistical physics terminology -- no TA jargon permitted.
 
 ---
 
-## 3. Unsupervised Learning: Gaussian Mixture Models
-
-Both observation planes employ **Gaussian Mixture Models (GMM)** with $n = 3$ components to
-discover hidden market regimes without human-labeled bias.
-
-> **Important Bypass Logic**: The GMM classifiers strictly evaluate **Entropy components only** (`[H_WPE, C_JS, MFI]` for Plane 1 and `[Shannon, SampEn]` for Plane 2). The **Kinematic Vectors (V, a)** and **Macro Z-Score** deliberately bypass the GMM layer. They are routed directly to the Agent Orchestrator to provide raw momentum and absolute scale context during the Cross-Plane Synthesis phase.
-
-### 3.1 Price Regime Classification (Plane 1)
-
-| Features | $[H_{WPE}, C_{JS}, \text{MFI}]$ |
-|---|---|
-| **Preprocessing** | `StandardScaler` (zero mean, unit variance) |
-| **Covariance Type** | `full` (no assumption on feature independence) |
-| **Label Mapping** | Sort clusters by mean feature value (ascending) |
-
-| Regime | Characteristics |
-|---|---|
-| **Stable Growth** | Low WPE, high complexity, low MFI. Structured, deterministic market. |
-| **Fragile Growth** | Moderate WPE, declining complexity. Ordinal pattern breakdown beginning. |
-| **Chaos/Panic** | High WPE, low complexity, high MFI. Maximum structural fragmentation. |
-
-### 3.2 Volume Regime Classification (Plane 2)
-
-| Features | [Vol<sub>Shannon</sub>, Vol<sub>SampEn</sub>] |
-|---|---|
-| **Preprocessing** | `StandardScaler` |
-| **Label Mapping** | Sort clusters by **sum of centroid coordinates** (Shannon + SampEn) |
-
-| Regime | Characteristics |
-|---|---|
-| **Consensus Flow** | Low Shannon + Low SampEn. Volume concentrated and regular. Institutional. |
-| **Dispersed Flow** | Moderate Shannon + SampEn. Transitional, mixed participation. |
-| **Erratic/Noisy Flow** | High Shannon + High SampEn. Fragmented and irregular. Retail/Panic. |
-
----
-
-## 4. The Agent Orchestrator: Cross-Plane Synthesis
-
-> **Disclaimer (Human-in-the-Loop):** The Agent is designed as a structural telemetry tool. It provides the "map" (Entropy states) and the "vehicle's dashboard" (Kinematic vectors V and a) to interpret complex market dynamics. However, the Agent is strictly an analytical observer. The final decision to act upon these conclusions rests entirely on human judgment and execution strategy.
-
-The LLM Agent (Anthropic Claude) operates as the **Cross-Plane Reasoning Engine** using a
-**ReAct (Reasoning and Acting) Loop** with 5 sequential tool calls:
+## Architecture Overview
 
 ```
-[1] fetch_market_data       -->  OHLCV data
-[2] compute_entropy_metrics -->  Plane 1: WPE, MFI, V (dE/dt), a (d2E/dt2)
-[3] compute_volume_entropy  -->  Plane 2: Shannon, SampEn
-[4] predict_market_regime   -->  Price Regime (GMM)
-[5] predict_volume_regime   -->  Volume Regime (GMM)
-[6] Cross-Plane Synthesis   -->  Unified systemic conclusion
+                        FINANCIAL ENTROPY AGENT
+                    =======================================
+
+                    [ RAW OHLCV & VN30 DATA ]
+                               |
+                               +-------------------------------------------------+
+                               |                                                 |
+                  [ MODULE A: UNSUPERVISED GMM ]                [ MODULE B: COMPOSITE RISK ENGINE ]
+                  (Dual-Plane Visual Diagnostics)               (Tri-Vector Mathematical Synthesis)
+                               |                                                 |
+                         +-----+-----+                             +-------------+-------------+
+                         |           |                             |             |             |
+                      PLANE 1     PLANE 2                      VECTOR 1      VECTOR 2      VECTOR 3
+                      (Price)     (Volume)                     (Price)       (Volume)     (VN30 Breadth)
+                         |           |                             |             |             |
+                     WPE Shock    Shannon                     WPE / Flux    SampEn / GZ    CorrEnt / MFI
+                     Flux Shock   SampEn                          |             |             |
+                         |           |                            +-------------+-------------+
+                     Tied GMM     Full GMM                                      |
+                    (3 Regimes)  (3 Regimes)                         PowerTransformer (Yeo-Johnson)
+                                                                                |
+                                                                         MinMaxScaler [0, 1]
+                                                                                |
+                                                              Weighted Sum: 0.4*V1 + 0.4*V2 + 0.2*V3
+                                                                                |
+                                                                 Composite Risk Score (0-100)
+                                                                                |
+                                                                 P75/P90 Rolling 504-day
+                                                                                |
+                                                              STABLE / ELEVATED / CRITICAL
 ```
 
-### Cross-Plane Synthesis Matrix
-
-The Agent cross-validates Price Physics against Liquidity Structure to prevent false positives:
-
-| Price Plane | Volume Plane | Synthesis | Rationale |
-|---|---|---|---|
-| Fragile / Chaos | Consensus Flow | **STRUCTURAL ACCUMULATION** | Price chaos is a surface phenomenon. Highly organized institutional liquidity absorbs supply. Smart Money accumulation. |
-| Fragile / Chaos | Erratic/Noisy Flow | **CRITICAL BREAKDOWN** | Both planes confirm systemic instability. Fragmented liquidity amplifies price chaos. No structural floor. |
-| Stable Growth | Erratic/Noisy Flow | **TREND EXHAUSTION** | Stable prices mask deteriorating liquidity structure. Volume fragmentation precedes price correction. |
-| *Other* | *Other* | **SYSTEM COHERENT** | Both planes structurally aligned. No cross-plane divergence. |
-
-**Why Cross-Plane matters**: A single-plane observation would classify "Fragile + Consensus" identically
-to "Fragile + Erratic" (both show price stress). Only by observing the volume plane can we
-distinguish **accumulation** (bullish) from **breakdown** (bearish) -- the difference between
-a buying opportunity and a systemic crisis.
+For the full technical specification, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ---
 
-## 5. Dashboard: Streamlit Terminal
+## Technical Requirements
 
-The dashboard provides three integrated views:
+- **Python**: 3.9+
+- **Core Dependencies**: `numpy`, `pandas`, `numba` (JIT optimization), `scikit-learn` (GMM, PowerTransformer, MinMaxScaler)
+- **Dashboard**: `streamlit`, `plotly`
+- **AI Orchestrator**: `anthropic` (requires `ANTHROPIC_API_KEY`)
 
-1. **All-in-One Structural Telemetry**: Candlestick chart with WPE overlay + Cross-Sectional
-   Entropy / MFI subplot. Regime backgrounds color-coded.
-2. **Dual-Plane DS Proof**: Side-by-side GMM scatter plots proving both Price and Volume regimes
-   are mathematically discovered without human labels.
-3. **Cross-Plane Agent Diagnostic**: Markdown-formatted diagnostic table with structured
-   Telemetry Module output, analysis sections, and mandatory conclusion.
-
----
-
-## 6. Resilience and Portability
-
-- **Dual-Pipeline Routing**: Cloud API (`vnstock`, `yfinance`) with automatic local file fallback
-  (CSV / XLSX upload).
-- **Numba JIT Compilation**: Critical $O(N^2)$ algorithms (SampEn) and iterative rolling windows
-  (WPE) are JIT-compiled for real-time dashboard performance.
-
----
-
-## 7. How to Run
-
-**Prerequisites:**
-- Python 3.9+
-- Anthropic API Key (optional -- mock orchestrator available for testing)
-
-**Installation:**
+## Installation
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Dependencies: `streamlit`, `pandas`, `numpy`, `plotly`, `scikit-learn`, `numba`, `vnstock`,
-`yfinance`, `anthropic`.
-
-**Execution:**
+## Usage
 
 ```bash
+# Launch the Dark Quant Terminal
 streamlit run dashboard.py
 ```
 
-**Agent Orchestrator (standalone test):**
-
-```bash
-python agent_orchestrator.py
-```
-
 ---
 
-## 8. Project Structure
+## Project Structure
 
 ```
 Financial Entropy Agent/
-|-- agent_orchestrator.py           # Cross-Plane Reasoning Engine (5 tools + synthesis)
-|-- dashboard.py                    # Streamlit UI: Dual scatter + agent diagnostic
-|-- architecture.md                 # Detailed architecture blueprint
-|-- README.md                       # <<< This file
+|-- agent_orchestrator.py    # Tri-Vector Composite Risk Engine + ReAct Orchestrator
+|-- dashboard.py             # Dark Quant Terminal (Streamlit + Plotly)
+|-- ARCHITECTURE.md          # Detailed technical architecture document
+|-- README.md                # This file
 |-- skills/
-|   |-- data_skill.py               # Data ingestion (vnstock, yfinance, local file)
-|   |-- quant_skill.py              # WPE, MFI, Shannon, SampEn, Cross-Sectional
-|   |-- ds_skill.py                 # Dual GMM: Price + Volume regime classifiers
+|   |-- data_skill.py        # Data ingestion (vnstock, yfinance)
+|   |-- quant_skill.py       # WPE, Momentum Flux, Volume Entropy, EVD
+|   |-- ds_skill.py          # PowerTransform + Tied GMM Classifiers
 ```
 
 ---
 
-## References
+## Institutional Use Cases & Practical Applications
 
-- Bandt, C. & Pompe, B. (2002). *Permutation Entropy: A Natural Complexity Measure for Time Series.* Physical Review Letters, 88(17).
-- Fadlallah, B. et al. (2013). *Weighted-permutation entropy: A complexity measure for time series incorporating amplitude information.* Physical Review E, 87(2).
-- Richman, J. S. & Moorman, J. R. (2000). *Physiological time-series analysis using approximate entropy and sample entropy.* American Journal of Physiology, 278(6).
-- Lopez-Ruiz, R., Mancini, H. L. & Calbet, X. (1995). *A statistical measure of complexity.* Physics Letters A, 209(5-6).
-- Rosso, O. A. et al. (2007). *Distinguishing noise from chaos.* Physical Review Letters, 99(15).
+This system is not a signal generator. It is a **macro-structural risk filter** designed to operate upstream of any trading strategy, providing a continuous, physics-based assessment of systemic market health.
+
+### 1. Systemic Risk Filter for Dynamic Position Sizing
+
+Quantitative funds and systematic portfolio managers can integrate the **Composite Risk Score (0-100)** into their position sizing and margin allocation frameworks. Rather than relying on subjective judgment calls, the score provides a mathematically derived, rolling measure of aggregate systemic stress.
+
+| Composite Risk Score | Recommended Action |
+|:---|:---|
+| **0 - 40 (Low)** | Full allocation (100%). Market structure exhibits systemic coherence. Entropy is low, liquidity is orderly. |
+| **40 - P75 (Moderate)** | Standard allocation. Monitor Momentum Flux direction for trajectory changes. |
+| **P75 - P90 (Elevated)** | Reduce gross exposure by 50%. Halt new position entries. Structural divergence detected across one or more planes. |
+| **> P90 (Critical)** | Maximum risk reduction. Initiate hedging protocols. Phase transition imminent -- top-decile extreme event in the rolling 504-day distribution. |
+
+The dynamic P75/P90 boundaries ensure the system self-calibrates to the prevailing volatility regime. During prolonged low-volatility periods, the thresholds compress, making the engine more sensitive to nascent structural shifts.
+
+### 2. Detecting Liquidity Divergences (Trap Detection)
+
+The decoupled multi-plane architecture enables the detection of **hollow rallies (bull traps)** and **false breakdowns** that single-indicator systems miss:
+
+- **Hollow Rally**: Plane 1 (Price) shows "Stable" regime, but Plane 2 (Volume) simultaneously classifies as "Erratic/Dispersed". The price stability is not supported by consensus liquidity flow -- volume entropy is fractured, indicating that the rally is structurally unsupported and vulnerable to sudden reversal.
+
+- **Capitulation Vacuum**: Plane 1 shows "Chaos" but `Vol_Global_Z` is negative (below-average absolute volume). High price entropy is driven by illiquidity and thin order books, not by genuine institutional selling. This distinction is critical for identifying bear-market bottoming processes.
+
+- **Climax Distribution**: High Composite Risk score but `Vol_Global_Z` is strongly positive. Excess liquidity is flowing into a structurally deteriorating market -- characteristic of peak FOMO before a distribution top. The system explicitly flags this as a bubble-peak topology, not a crash signal.
+
+### 3. Measuring Internal Structural Health (Sector Rotation Detection)
+
+Vector 3 (VN30 Breadth) provides a unique diagnostic layer invisible to index-level analysis:
+
+- **Correlation Entropy < 40%**: The VN30's movement is dominated by a narrow set of heavyweight pillars (e.g., VIC, VHM, VCB). The index appears stable, but internal breadth is collapsed. This "propped-up" structure is inherently fragile -- if the leading heavyweights falter, the index has no broad-based support to absorb the shock.
+
+- **Correlation Entropy > 70%**: The component stocks are moving in highly independent directions. This signals aggressive internal sector rotation or capital flight among heavy-cap constituents. The main index may appear range-bound while aggressive structural recomposition occurs beneath the surface.
+
+By monitoring this metric alongside Planes 1 and 2, a portfolio manager receives advance warning of internal fracturing **before** it manifests as visible index-level volatility.
+
+---
+
+## Academic References
+
+- Bandt, C. & Pompe, B. (2002). *Permutation Entropy: A Natural Complexity Measure for Time Series*. Physical Review Letters, 88(17).
+- Fadlallah, B. et al. (2013). *Weighted-Permutation Entropy: A Complexity Measure for Time Series Incorporating Amplitude Information*. Physical Review E, 87(2).
+- Richman, J.S. & Moorman, J.R. (2000). *Physiological Time-Series Analysis Using Approximate Entropy and Sample Entropy*. American Journal of Physiology.
+- Yeo, I.K. & Johnson, R.A. (2000). *A New Family of Power Transformations to Improve Normality or Symmetry*. Biometrika, 87(4).
+
+---
+
+**Disclaimer**: This system is designed as a quantitative research tool for institutional systemic risk surveillance. It is not a trading signal generator. All investment decisions based on its output require final approval from qualified human analysts.

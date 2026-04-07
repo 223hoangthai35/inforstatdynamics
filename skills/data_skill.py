@@ -166,7 +166,7 @@ if __name__ == "__main__":
 
     df = get_latest_market_data(
         ticker="VNINDEX",
-        start_date="2024-01-01",
+        start_date="2020-01-01",
     )
 
     print(f"\nShape: {df.shape}")

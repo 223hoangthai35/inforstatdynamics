@@ -354,6 +354,48 @@ def calc_rolling_volume_entropy(
 
 
 # ==============================================================================
+# KINEMATIC MOMENTUM ENTROPY FLUX
+# ==============================================================================
+def calc_momentum_entropy_flux(
+    wpe: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Kinematic Momentum Entropy Flux (%).
+    V = Delta(WPE) (Velocity of entropy change).
+    a = Delta(V) (Acceleration of entropy change).
+    Flux = sign(V) * sqrt(V^2 + a^2) * 100 -> percentage fluctuation metric.
+    Returns: (velocity, acceleration, momentum_flux_pct)
+    """
+    wpe = np.asarray(wpe, dtype=np.float64)
+    n = len(wpe)
+
+    velocity = np.full(n, np.nan)
+    acceleration = np.full(n, np.nan)
+    momentum_flux = np.full(n, np.nan)
+
+    # V = WPE(t) - WPE(t-1)
+    velocity[1:] = np.diff(wpe)
+
+    # a = V(t) - V(t-1)
+    valid_v = velocity.copy()
+    acceleration[2:] = np.diff(valid_v[1:])
+
+    # Flux = sign(V) * sqrt(V^2 + a^2) * 100
+    v = velocity
+    a = acceleration
+    magnitude = np.sqrt(np.where(np.isnan(v), 0, v) ** 2 +
+                        np.where(np.isnan(a), 0, a) ** 2)
+    sign_v = np.sign(np.where(np.isnan(v), 0, v))
+    momentum_flux = sign_v * magnitude * 100.0
+
+    # Giu NaN cho cac diem dau khong co du du lieu
+    momentum_flux[0] = np.nan
+    momentum_flux[1] = np.nan
+
+    return velocity, acceleration, momentum_flux
+
+
+# ==============================================================================
 # TESTING BLOCK
 # ==============================================================================
 if __name__ == "__main__":
@@ -365,85 +407,31 @@ if __name__ == "__main__":
     dummy = np.random.randn(100)
     h, c = calc_wpe_complexity(dummy, m=3, tau=1)
     mfi = h * (1.0 - c)
-    print(f"  H_wpe  = {h:.6f}  (random -> ky vong ~0.9+)")
-    print(f"  C_js   = {c:.6f}  (random -> ky vong thap)")
+    print(f"  H_wpe  = {h:.6f}")
+    print(f"  C_js   = {c:.6f}")
     print(f"  MFI    = {mfi:.6f}")
-    print(f"  Types  : H={type(h).__name__}, C={type(c).__name__}")
 
-    print()
+    print("\n" + "=" * 60)
+    print("TEST 2: Momentum Entropy Flux (Kinematic)")
     print("=" * 60)
-    print("TEST 2: Rolling WPE (shape verification)")
-    print("=" * 60)
-    series = np.random.randn(200)
-    wpe_arr, c_arr = calc_rolling_wpe(series, m=3, tau=1, window=22)
-    mfi_arr = calc_mfi(wpe_arr, c_arr)
-    print(f"  Input shape : {series.shape}")
-    print(f"  WPE shape   : {wpe_arr.shape}")
-    print(f"  MFI shape   : {mfi_arr.shape}")
-    print(f"  NaN count   : WPE={np.isnan(wpe_arr).sum()}, C={np.isnan(c_arr).sum()}")
-    print(f"  Last 5 WPE  : {wpe_arr[-5:]}")
-    print(f"  Last 5 C    : {c_arr[-5:]}")
+    test_wpe = np.array([0.50, 0.52, 0.55, 0.60, 0.58, 0.55, 0.50, 0.48, 0.52, 0.56])
+    vel, acc, flux = calc_momentum_entropy_flux(test_wpe)
+    print(f"  WPE Input   : {test_wpe}")
+    print(f"  Velocity    : {np.round(vel, 5)}")
+    print(f"  Acceleration: {np.round(acc, 5)}")
+    print(f"  Flux (%)    : {np.round(flux, 3)}")
 
-    print()
+    print("\n" + "=" * 60)
+    print("TEST 3: Rolling WPE -> Momentum Flux Pipeline")
     print("=" * 60)
-    print("TEST 3: Cross-Sectional Correlation Entropy")
-    print("=" * 60)
-    fake_rets = pd.DataFrame(
-        np.random.randn(100, 10),
-        columns=[f"S{i}" for i in range(10)],
-    )
-    corr_ent = calc_correlation_entropy(fake_rets, window=22)
-    valid = corr_ent.dropna()
-    print(f"  Input shape  : {fake_rets.shape}")
-    print(f"  Valid values : {len(valid)}")
-    print(f"  Mean entropy : {valid.mean():.2f} / 100")
-    print(f"  Last 3       : {valid.tail(3).values}")
+    log_rets = np.random.randn(200) * 0.01
+    wpe_arr, c_arr = calc_rolling_wpe(log_rets, m=3, tau=1, window=22)
+    valid_wpe = wpe_arr[~np.isnan(wpe_arr)]
+    if len(valid_wpe) > 5:
+        v, a, f_pct = calc_momentum_entropy_flux(valid_wpe)
+        print(f"  Valid WPE points : {len(valid_wpe)}")
+        print(f"  Flux range       : [{np.nanmin(f_pct):.3f}%, {np.nanmax(f_pct):.3f}%]")
+        print(f"  Flux mean        : {np.nanmean(f_pct):.3f}%")
+    else:
+        print("  Khong du du lieu WPE.")
 
-    print()
-    print("=" * 60)
-    print("TEST 4: Sample Entropy (SampEn)")
-    print("=" * 60)
-    # Random -> SampEn cao (bat quy luat)
-    rand_sig = np.random.randn(200)
-    se_rand = calc_sample_entropy(rand_sig, m=2)
-    # Periodic -> SampEn thap (co quy luat)
-    periodic_sig = np.sin(np.linspace(0, 20 * np.pi, 200))
-    se_periodic = calc_sample_entropy(periodic_sig, m=2)
-    print(f"  SampEn (random)   = {se_rand:.4f}  (ky vong cao, ~2.0+)")
-    print(f"  SampEn (periodic) = {se_periodic:.4f}  (ky vong thap, <1.0)")
-    print(f"  Validation        : random > periodic = {se_rand > se_periodic}")
-
-    print()
-    print("=" * 60)
-    print("TEST 6: Shannon Entropy (Histogram, bins='auto')")
-    print("=" * 60)
-    uniform_data = np.random.uniform(0, 100, 200)
-    concentrated = np.concatenate([np.full(180, 50.0), np.random.randn(20)])
-    h_uniform = calc_shannon_entropy_hist(uniform_data, bins="auto")
-    h_concentrated = calc_shannon_entropy_hist(concentrated, bins="auto")
-    print(f"  H (uniform)      = {h_uniform:.4f}  (ky vong ~1.0)")
-    print(f"  H (concentrated) = {h_concentrated:.4f}  (ky vong thap, <0.5)")
-    print(f"  Validation       : uniform > concentrated = {h_uniform > h_concentrated}")
-
-    print()
-    print("=" * 60)
-    print("TEST 7: Macro-Micro Fusion Volume Entropy (window=60)")
-    print("=" * 60)
-    fake_volume = np.abs(np.random.randn(300)) * 1e6 + 5e5
-    sh_arr, se_arr, gz_arr, rz_arr = calc_rolling_volume_entropy(fake_volume, window=60)
-    print(f"  Input shape       : {fake_volume.shape}")
-    print(f"  Shannon shape     : {sh_arr.shape}")
-    print(f"  SampEn shape      : {se_arr.shape}")
-    print(f"  Global Z shape    : {gz_arr.shape}")
-    print(f"  Rolling Z shape   : {rz_arr.shape}")
-    print(f"  NaN count         : Shannon={np.isnan(sh_arr).sum()}, SampEn={np.isnan(se_arr).sum()}")
-    valid_sh = sh_arr[np.isfinite(sh_arr)]
-    valid_se = se_arr[np.isfinite(se_arr)]
-    valid_gz = gz_arr[np.isfinite(gz_arr)]
-    valid_rz = rz_arr[np.isfinite(rz_arr)]
-    print(f"  Shannon range     : [{valid_sh.min():.4f}, {valid_sh.max():.4f}]")
-    print(f"  SampEn range      : [{valid_se.min():.4f}, {valid_se.max():.4f}]")
-    print(f"  Global Z range    : [{valid_gz.min():.4f}, {valid_gz.max():.4f}]")
-    print(f"  Rolling Z range   : [{valid_rz.min():.4f}, {valid_rz.max():.4f}]")
-    print(f"  Last 5 Global Z   : {gz_arr[-5:]}")
-    print(f"  Last 5 Rolling Z  : {rz_arr[-5:]}")
