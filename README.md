@@ -1,119 +1,250 @@
 # Financial Entropy Agent
-### An Entropy-Driven Volatility & XAI Risk Terminal
+
+**An entropy-based market risk surveillance system that uses Information Theory and Statistical Physics to detect structural risk invisible to traditional volatility measures.**
+
+Built by a former securities broker who studied physics — motivated by the observation that financial markets exhibit Type-2 chaos, where dangerous coordination (herding, panic) produces deterministic structure that entropy can detect.
+
+![Regime Validation](validation/regime_validation.png)
 
 ---
 
-## Abstract
+## The Problem
 
-**Financial Entropy Agent** is an institutional-grade systemic risk surveillance engine that bridges Statistical Physics (Information Theory, Symbolic Dynamics) with advanced Econometrics (GARCH-X). It operates purely autonomously, identifying regime shifts, quantifying tail risk, and producing real-time Explainable AI (XAI) risk narratives.
+Traditional risk management relies on volatility — the standard deviation of past returns. This approach has a fundamental blind spot: **volatility is backward-looking**. It tells you the market *was* risky, not that it *is becoming* risky. Before every major crash, rolling volatility is low because the market appears calm.
 
-The core innovation is the integration of **Micro-structural Entropy**—specifically Weighted Permutation Entropy (WPE) and Sample Entropy (SampEn)—as exogenous predictors within a Conditional Volatility model (GARCH-X). Rather than relying on simple price thresholds, the system discovers structural market regimes via Full-Covariance Gaussian Mixture Models (GMM) in a multi-dimensional phase space, quantifying how thermodynamic "disorder" amplifies or mitigates financial risk.
+As a securities broker observing the Vietnamese stock market (VNINDEX), I noticed a pattern: the most dangerous periods weren't when the market was visibly chaotic, but when price movements became unusually *structured* — when everyone was buying the same stocks, following the same momentum, creating an illusion of stability that masked fragility underneath.
 
----
-
-## 1. Theoretical Rationale & Paradigm Shift
-
-Traditional financial analysis assumes stationarity and normality in asset returns. This system operates on a fundamentally different premise designed for complex, non-stationary systems:
-
-1. **Information over Amplitude:** WPE focuses on the ordinal ranking of sequential prices, identifying structural causality rather than just magnitude.
-2. **Trajectory Complexity:** Sample Entropy (SPE_Z) evaluates the predictability of the price path without self-matching bias.
-3. **Macro-Micro Fusion:** Unsupervised machine learning (GMM) clusters these physical metrics to identify natural Regime Boundaries (Stable, Fragile, Chaos), eliminating human bias.
-4. **Econometric Synthesis (GARCH-X):** The thermodynamic variables are injected directly into the variance equation to forecast future conditional volatility and extreme Expected Shortfall (Tail Risk).
+This led to a hypothesis rooted in my physics background: **if financial markets are Type-2 chaotic systems, then entropy — the measure of disorder — should detect structural risk before volatility does.**
 
 ---
 
-## 2. Mathematical Framework
+## The Approach
 
-The following equations represent the formal basis of the Tri-Vector Risk Architecture.
+The system measures market disorder through three entropy metrics, classifies structural regimes using unsupervised learning, and estimates conditional volatility via GARCH modeling.
 
-### 2.1 Vector 1: Price Phase Space (Structural Order)
+### Entropy Feature Engineering
 
-**Weighted Permutation Entropy (WPE)** measures ordinal pattern disorder of log-returns. For an embedding dimension $m$ and delay $\tau=1$, the amplitude-weighted probability of permutation $\pi$ is:
+**Weighted Permutation Entropy (WPE)** measures the ordinal pattern disorder in price log-returns. Low WPE means price movements follow deterministic, repeating patterns — the signature of coordinated behavior (herding, panic, momentum). High WPE means random, unpredictable movements — a normal, healthy market.
 
-$$ \hat{p}_w(\pi) = \frac{\sum_{t : \text{ord}(\mathbf{X}_t) = \pi} w_t}{\sum_{t=1}^{N-(m-1)\tau} w_t} $$
+**Standardized Price Sample Entropy (SPE_Z)** measures trajectory complexity of close prices. It captures how predictable the price path is in amplitude space, complementing WPE's ordinal analysis.
 
-where $w_t = \frac{1}{m} \sum_{k=0}^{m-1} |x_{t+k\tau} - \bar{\mathbf{X}}_t|$ (variance weight). The WPE is then:
+**Volume Entropy (Shannon + SampEn)** measures liquidity structure — whether capital flow is concentrated (institutional consensus) or dispersed (fragmented, no agreement).
 
-$$ H_{WPE} = -\frac{1}{\ln(m!)} \sum_{\pi} \hat{p}_w(\pi) \ln(\hat{p}_w(\pi)) $$
+### Regime Classification (GMM)
 
-**Sample Entropy Z-Score (SPE_Z)** measures price predictability. Using Chebyshev distance with tolerance $r = 0.2\sigma$:
+A Full-Covariance Gaussian Mixture Model (n=3) operates directly on raw [WPE, SPE_Z] features — no preprocessing or normalization — discovering the natural topological boundaries of three market phases:
 
-$$ SampEn(m, r) = -\ln\frac{A^{(m)}(r)}{B^{(m)}(r)} $$
+- **Deterministic** (low entropy) — Strong ordinal structure in price movements. Indicates trending, coordinated behavior. *Highest risk.*
+- **Transitional** (mid entropy) — Phase boundary between ordered and disordered states. *Moderate risk.*
+- **Stochastic** (high entropy) — Random walk behavior. Normal, healthy market. *Lowest risk.*
 
-$$ SPE\_Z = \frac{SampEn - \mu_{SampEn}}{\sigma_{SampEn}} $$
+### Conditional Volatility (GARCH)
 
-### 2.2 Vector 2: Liquidity Structure (Volume Dispersion)
+GARCH(1,1) provides the conditional volatility backbone, with entropy features tested as exogenous variables (GARCH-X). Filtered Historical Simulation computes Expected Shortfall (ES 5%) without assuming Gaussian tails.
 
-**Volume Shannon Entropy ($H_{Shannon}$)** captures how capital flow is distributed over a 60-day rolling window:
+### AI Explanation Layer
 
-$$ H_{Shannon} = -\frac{1}{\ln(K)} \sum_{k=1}^{K} p_k \ln(p_k) $$
+An LLM agent (Claude API) translates quantitative signals into natural-language risk narratives for non-technical investors — the "last mile" between mathematical models and actionable advice.
 
-### 2.3 Vector 3: Cross-Sectional Breadth
-
-The systemic coherence of the VN30 index is determined by Eigenvalue Decomposition of the correlation matrix:
-
-$$ S_{corr} = -\frac{1}{\ln(M)} \sum_{i=1}^M \lambda_i^* \ln(\lambda_i^*) $$
-
-where $\lambda_i^*$ are the normalized eigenvalues sum to 1. A state of $S_{corr} > 70\\%$ defines a fragmented internal market condition.
+For the full mathematical formulations (WPE, SampEn, Yeo-Johnson, GMM specifications, GARCH variance equations), see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
-## 3. The Econometric Risk Engine (GARCH-X)
+## Validation Results
 
-Rather than treating entropy merely as an indicator, it acts as the primary exogenous vector ($X$) in the Generalized Autoregressive Conditional Heteroskedasticity framework.
+All validation is out-of-sample on VNINDEX data (2020–2026, ~1,600 trading days). Code is in the `validation/` folder and fully reproducible.
 
-The variance equation for GARCH(1,1)-X is defined as:
+### V1: Regime Labels Discriminate Future Volatility
 
-$$ \sigma_t^2 = \omega + \alpha \epsilon_{t-1}^2 + \beta \sigma_{t-1}^2 + \delta_1 H_{WPE, t-1} + \delta_2 H_{Shannon, t-1} $$
+Entropy-based regime labels significantly predict forward 20-day realized volatility.
 
-The expected shortfall ($ES_{5\\%}$) isolates tail risk under the assumed skewed-Student-t distribution. To create the final Adjusted Volatility Output, the system applies **Regime Conditionals**:
+| Regime | Mean Forward 20d Vol | Median | n |
+|:-------|:---------------------|:-------|:--|
+| **Deterministic** (High Risk) | 21.59% | 20.23% | 464 |
+| Transitional | 18.00% | 16.11% | 754 |
+| **Stochastic** (Low Risk) | 15.15% | 11.54% | 340 |
 
-$$ \sigma_{adjusted} = \sigma_t \times R_{multiplier} $$
+**Kruskal-Wallis H = 150.89, p < 0.0001** — Regime labels carry statistically significant information about future market risk.
 
-Where $R_{multiplier}$ is dynamically generated by the GMM:
-- Stable Regime: $1.0\times$
-- Fragile Regime / Dispersed Flow: $1.3\times - 1.4\times$
-- Chaos Regime / Erratic Flow: $1.8\times - 2.2\times$
+### V3: Tail Risk Detection — Where Entropy Excels
+
+The system's discriminative power *increases with event severity* — precisely the behavior required for tail risk management.
+
+| Timeframe | Drawdown | Stochastic | Deterministic | Lift |
+|:----------|:---------|:-----------|:--------------|:-----|
+| 5 days | > 3% | 8.5% | 17.4% | **2.06×** |
+| 5 days | > 7% | 0.8% | 4.3% | **5.50×** |
+| 10 days | > 5% | 6.3% | 16.0% | **2.54×** |
+| 20 days | > 7% | 6.5% | 19.6% | **3.00×** |
+
+When the system identifies a Deterministic regime, the probability of a severe drawdown (>7% in 5 days) is **5.5 times higher** than during Stochastic regimes. For a risk manager, this is actionable information for position sizing.
+
+![Risk Alert Hit Rate](validation/risk_alert_hitrate.png)
+
+### V4: Entropy vs Simple Volatility — Complementary, Not Replacement
+
+| Model | Features | H-statistic | p-value |
+|:------|:---------|:------------|:--------|
+| A: Entropy | WPE, SPE_Z | 150.55 | < 0.0001 |
+| B: Simple Vol | Rolling 22d vol, 5d vol change | 299.78 | < 0.0001 |
+| C: Combined | WPE, SPE_Z, Rolling 22d vol | 229.04 | < 0.0001 |
+
+Simple volatility discriminates future volatility better (H=299.78 vs 150.55) — this is expected because past volatility auto-correlates with future volatility. **However, entropy measures a different dimension of risk: structural fragility.** Entropy detects FOMO peaks, herding behavior, and momentum concentration *before* they manifest as volatility spikes. The Combined model (H=229.04) confirms entropy carries complementary information beyond what simple volatility provides.
+
+![Entropy vs Simple Vol](validation/entropy_vs_simple.png)
+
+### V2: GARCH Forecast Evaluation — Honest Limitations
+
+| Metric | GARCH(1,1) | Rolling 22d | Winner |
+|:-------|:-----------|:------------|:-------|
+| QLIKE | 1.7765 | 1.5737 | Rolling 22d |
+| MSE Variance | 15.5130 | 15.3941 | Rolling 22d |
+| Correlation(σ, \|r\|) | 0.3302 | — | — |
+
+GARCH(1,1) underperforms simple rolling volatility on point forecast metrics for VNINDEX. This is consistent with frontier market characteristics — VNINDEX exhibits jump risk (circuit breakers, policy shocks) that GARCH's smooth conditional variance cannot capture. The positive directional correlation (r=0.33) confirms the model tracks volatility direction correctly but misestimates magnitude.
+
+This result justifies the system's use of Filtered Historical Simulation rather than parametric VaR — FHS does not assume Gaussian tails and is more robust to the fat-tailed distribution of VNINDEX returns.
+
+![GARCH Forecast Evaluation](validation/garch_forecast_eval.png)
 
 ---
 
-## 4. Explainable AI (XAI) Synthesis
+## Key Insight: The Entropy Paradox
 
-The system extracts **Kinematic Entropy Metrics** (Velocity $V_{WPE}$ and Acceleration $a_{WPE}$):
+The most important finding from validation was counterintuitive: **in financial markets, low entropy = high risk, and high entropy = low risk.**
 
-$$ V_{WPE}(t) = WPE(t) - WPE(t-1) $$
-$$ a_{WPE}(t) = V_{WPE}(t) - V_{WPE}(t-1) $$
+This is the *opposite* of physical systems, where low entropy indicates calm equilibrium. In financial markets — which are Type-2 chaotic systems with reflexive, adversarial participants — low entropy means price movements have become deterministic. Deterministic structure in financial prices is not a sign of health; it is the signature of **coordinated behavior**: herding, panic selling, or momentum-driven rallies. These states are inherently unstable and produce the largest realized moves.
 
-These derivatives trigger fully autonomous XAI routines. Rather than outputting numerical complexity tables, the Agent Synthesizer summarizes the WPE acceleration, the Base vs. Adjusted GARCH Volatility, and the Divergences between Price and Volume in a cohesive, natural language **Risk Intelligence Report**.
+Maximum entropy, by contrast, means maximum randomness — a market where diverse participants with diverse strategies cancel each other out. This is the *healthy* state.
+
+**Entropy does not measure volatility. It measures the absence of dangerous coordination.**
+
+This insight directly connects to the Type-2 chaos hypothesis that motivated the project: in a system where participants observe and react to each other (reflexivity), order is a warning signal.
 
 ---
 
-## 5. System Requirements and Usage
+## Lessons Learned
 
-- **Python**: 3.9+
-- **Core Dependencies**: `arch` (GARCH), `scikit-learn` (GMM), `numba`, `numpy`, `pandas`.
-- **UI & Analysis**: `streamlit`, `plotly`
-- **Generative XAI**: `anthropic` (Claude 3 Opus/Sonnet required).
+**1. Validation changes everything.** The initial regime labels were inverted (mislabeled "Stable" for the highest-risk regime). Without forward-looking validation, this error would have gone undetected and the system would have given exactly wrong advice. Lesson: never trust model outputs without out-of-sample evidence.
 
-### Installation
-```bash
-pip install -r requirements.txt
-# Ensure the arch library is properly installed for the GARCH-X engine:
-pip install arch
+**2. Complexity must justify itself.** GARCH-X with entropy exogenous variables was statistically insignificant during calm periods — entropy adds no value to volatility forecasting when the market is already stable. The system needed to be redesigned with adaptive activation: entropy contributes through regime classification (always active) rather than forcing it into the variance equation.
+
+**3. Simple benchmarks are essential.** Rolling 22-day volatility outperformed GARCH on VNINDEX. This doesn't invalidate the entropy approach — it clarifies its role: entropy excels at structural risk detection (Lift 5.5× for tail events), while simple volatility excels at point forecasting. They solve different problems.
+
+**4. Domain knowledge matters more than model sophistication.** The Entropy Paradox was only interpretable because of my background in physics (understanding entropy in different system types) and finance (understanding that coordinated behavior drives crashes). A purely technical approach would have either missed the inversion or abandoned entropy as "broken."
+
+---
+
+## Architecture Overview
+
+```
+                        FINANCIAL ENTROPY AGENT
+                    =======================================
+
+                    [ RAW OHLCV & VN30 DATA ]
+                               |
+              +----------------+----------------+
+              |                                 |
+   [ ENTROPY FEATURE ENGINE ]      [ GARCH VOLATILITY ENGINE ]
+   WPE, SPE_Z, Vol_Shannon,       GARCH(1,1) + FHS
+   Vol_SampEn                      -> sigma_t, VaR 5%, ES 5%
+              |                                 |
+   [ GMM REGIME CLASSIFIER ]                   |
+   Deterministic / Transitional                 |
+   / Stochastic (no preprocessing)              |
+              |                                 |
+              +----------------+----------------+
+                               |
+                   [ REGIME x VOLATILITY ]
+                   sigma_adjusted = sigma_t x regime_multiplier
+                               |
+                   [ AI EXPLANATION LAYER ]
+                   Claude API -> Natural language
+                   risk narrative
+                               |
+                   [ STREAMLIT DASHBOARD ]
+                   Interactive terminal
 ```
 
-### Execution
+For detailed mathematical specifications, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+---
+
+## Project Structure
+
+```
+Financial Entropy Agent/
+├── agent_orchestrator.py       # GARCH engine, risk scoring, AI agent orchestrator
+├── dashboard.py                # Streamlit interactive terminal
+├── skills/
+│   ├── data_skill.py           # Data ingestion (vnstock, yfinance)
+│   ├── quant_skill.py          # WPE, SampEn, Shannon, kinematics
+│   └── ds_skill.py             # GMM regime classification
+├── validation/
+│   ├── regime_validation.py    # V1: Regime labels vs forward realized vol
+│   ├── garch_forecast_eval.py  # V2: GARCH out-of-sample forecast
+│   ├── risk_alert_hitrate.py   # V3: Drawdown prediction hit rate
+│   └── entropy_vs_simple.py    # V4: Entropy vs simple vol comparison
+├── ARCHITECTURE.md             # Full mathematical specifications
+├── requirements.txt
+└── README.md                   # This file
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.9+
+- An Anthropic API key (for the AI agent; optional — system works without it)
+
+### Installation
+
+```bash
+git clone https://github.com/223hoangthai35/financial-entropy-agent.git
+cd financial-entropy-agent
+pip install -r requirements.txt
+```
+
+### Run the Dashboard
+
 ```bash
 streamlit run dashboard.py
 ```
 
-### Institutional Workflow Note
+### Run Validation Suite
 
-Financial Entropy Agent strictly provides **Macro-Structural Risk Validation**. It is built to serve as a filtering overlay upon discretionary or systematic trading models to prevent exposure allocation entirely during *Chaos Regimes* or accelerating *Fragility*.
+```bash
+python validation/regime_validation.py
+python validation/risk_alert_hitrate.py
+python validation/entropy_vs_simple.py
+python validation/garch_forecast_eval.py
+```
 
 ---
 
-*Academic References:*
-1. Bandt, C. & Pompe, B. (2002). Permutation Entropy: A Natural Complexity Measure for Time Series.
-2. Richman, J.S. & Moorman, J.R. (2000). Sample Entropy.
-3. Engle, R. F. (1982). Autoregressive Conditional Heteroscedasticity with Estimates of the Variance of United Kingdom Inflation.
+## Technical Requirements
+
+`numpy`, `pandas`, `numba` (JIT), `scikit-learn` (GMM), `scipy`, `arch` (GARCH), `statsmodels`, `plotly`, `streamlit`, `anthropic` (optional), `matplotlib`, `vnstock`, `yfinance`
+
+---
+
+## References
+
+- Bandt, C. & Pompe, B. (2002). *Permutation Entropy: A Natural Complexity Measure for Time Series.* Physical Review Letters, 88(17).
+- Fadlallah, B. et al. (2013). *Weighted-Permutation Entropy: A Complexity Measure for Time Series Incorporating Amplitude Information.* Physical Review E, 87(2).
+- Richman, J.S. & Moorman, J.R. (2000). *Physiological Time-Series Analysis Using Approximate Entropy and Sample Entropy.* American Journal of Physiology.
+- Bollerslev, T. (1986). *Generalized Autoregressive Conditional Heteroskedasticity.* Journal of Econometrics.
+
+---
+
+## About the Author
+
+Physics background -> Securities broker -> Data Science.
+
+This project was born from observing that traditional technical analysis systematically failed to warn about structural market risks. The hypothesis — that entropy from statistical physics could detect dangerous coordination in financial markets — was validated through rigorous out-of-sample testing on 6 years of VNINDEX data.
+
+---
+
+*Disclaimer: This system is a quantitative research tool for structural risk assessment. It is not investment advice. All investment decisions require final approval from qualified professionals.*

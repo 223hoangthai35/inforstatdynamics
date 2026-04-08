@@ -21,9 +21,9 @@ logger = logging.getLogger(__name__)
 # REGIME LABELS
 # ==============================================================================
 REGIME_NAMES: dict[int, str] = {
-    0: "Stable",
-    1: "Fragile",
-    2: "Chaos",
+    0: "Deterministic",   # Lowest entropy — HIGH RISK (strong trend, crash/rally)
+    1: "Transitional",   # Mid entropy    — MODERATE RISK (phase transition)
+    2: "Stochastic",     # Highest entropy — LOW RISK (random walk, normal market)
 }
 
 
