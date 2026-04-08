@@ -54,7 +54,7 @@ The systemic coherence of the VN30 index is determined by Eigenvalue Decompositi
 
 $$ S_{corr} = -\frac{1}{\ln(M)} \sum_{i=1}^M \lambda_i^* \ln(\lambda_i^*) $$
 
-where $\lambda_i^*$ are the normalized eigenvalues sum to 1. A state of $S_{corr} > 70\%$ defines a fragmented internal market condition.
+where $\lambda_i^*$ are the normalized eigenvalues sum to 1. A state of $S_{corr} > 70\\%$ defines a fragmented internal market condition.
 
 ---
 
@@ -66,7 +66,7 @@ The variance equation for GARCH(1,1)-X is defined as:
 
 $$ \sigma_t^2 = \omega + \alpha \epsilon_{t-1}^2 + \beta \sigma_{t-1}^2 + \delta_1 H_{WPE, t-1} + \delta_2 H_{Shannon, t-1} $$
 
-The expected shortfall ($ES_{5\%}$) isolates tail risk under the assumed skewed-Student-t distribution. To create the final Adjusted Volatility Output, the system applies **Regime Conditionals**:
+The expected shortfall ($ES_{5\\%}$) isolates tail risk under the assumed skewed-Student-t distribution. To create the final Adjusted Volatility Output, the system applies **Regime Conditionals**:
 
 $$ \sigma_{adjusted} = \sigma_t \times R_{multiplier} $$
 
