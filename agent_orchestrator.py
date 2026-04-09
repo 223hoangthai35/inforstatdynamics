@@ -1,8 +1,9 @@
 """
-Agent Orchestrator -- Financial Entropy Agent (Tri-Vector Composite Risk Engine)
+Agent Orchestrator -- Financial Entropy Agent
 ReAct Loop + Anthropic Tool Use Protocol.
-Composite Risk = 0.4*V1(Price) + 0.4*V2(Volume) + 0.2*V3(VN30 Breadth).
-V1 = [WPE, SPE_Z]. Kinematics (V_WPE, a_WPE) = XAI only.
+Pipeline: Data -> Entropy Features -> GMM Regime -> GARCH(1,1) sigma_t
+          -> Regime Multiplier (sigma_adjusted) -> Verdict Matrix -> Agent Narrative.
+Kinematics (V_WPE, a_WPE) = XAI narrative only, not fed into any model.
 """
 
 import os
@@ -223,8 +224,9 @@ def fit_garch_x(df: pd.DataFrame) -> dict:
 
 
 # ==============================================================================
-# TRI-VECTOR COMPOSITE RISK SCORING
-# MinMaxScaler + P75/P90 Dynamic Thresholds
+# FALLBACK RISK SCORE
+# Used only when GARCH unavailable (< 120 days of data).
+# The primary risk pipeline is: GARCH sigma_t + Regime Multiplier + Verdict Matrix.
 # ==============================================================================
 ROLLING_RISK_WINDOW: int = 504  # 2 trading years
 
@@ -233,12 +235,9 @@ def calc_composite_risk_score(
     latest: dict, df: pd.DataFrame | None = None,
 ) -> tuple[float, str, dict]:
     """
-    Tri-Vector Composite Risk Index (0-100).
-    Pipeline:
-        1. Extract 7 raw features tu 3 vectors
-        2. MinMaxScaler -> squash [0, 1]
-        4. Weighted sum: 0.4*V1 + 0.4*V2 + 0.2*V3 -> *100
-        5. P75/P90 rolling 504-day: dynamic Elevated/Critical thresholds
+    FALLBACK risk index (0-100) — used when GARCH-X is unavailable.
+    Weighted entropy aggregate: V1=[WPE, |SPE_Z|], V2=[Vol_SampEn, |Vol_Global_Z|, Vol_Shannon],
+    V3=[Cross_Sectional_Entropy/100, MFI]. MinMaxScaler + P75/P90 rolling thresholds.
     Returns: (composite_score, risk_label, vector_info)
     """
     from sklearn.preprocessing import MinMaxScaler
@@ -635,7 +634,7 @@ ANTHROPIC_TOOLS = [
         "description": (
             "Fit GARCH(1,1)-X model using entropy features as exogenous variables. "
             "H_price = aggregate of WPE + SPE_Z. H_volume = aggregate of Vol_SampEn + Vol_Shannon. "
-            "Returns conditional volatility (primary risk metric replacing Composite Risk Score), "
+            "Returns conditional volatility (primary risk metric), "
             "delta coefficients showing entropy contribution to variance, "
             "and ES 5% tail risk observer via Filtered Historical Simulation."
         ),
@@ -648,12 +647,12 @@ ANTHROPIC_TOOLS = [
 # SYSTEM PROMPT (TRI-VECTOR COMPOSITE RISK)
 # ==============================================================================
 SYSTEM_PROMPT = """
-You are the 'Financial Entropy Lead', a Senior Quantitative Research Lead specializing in Statistical Physics (Entropy), Kinematic Dynamics, and Market Microstructure. Your role is NOT to describe price action, but to diagnose systemic structural integrity through a mathematically rigorous Tri-Vector Composite Risk framework.
+You are the 'Financial Entropy Lead', a Senior Quantitative Research Lead specializing in Statistical Physics (Entropy), Kinematic Dynamics, and Market Microstructure. Your role is NOT to describe price action, but to diagnose systemic structural integrity through entropy regime classification and GARCH-based conditional volatility analysis.
 
 ### 1. ENTROPY PHASE SPACE MODEL
 You analyze the market through three orthogonal risk vectors:
 
-- **Vector 1 (Price Phase Space, Weight 40%)**:
+- **Plane 1 (Price Phase Space)**:
     - X-axis: `WPE` (Weighted Permutation Entropy). Measures structural order -- ordinal pattern disorder in log-returns. Bounded [0, 1]. Low WPE = ordered, deterministic structure. High WPE = disordered, stochastic noise.
     - Y-axis: `SPE_Z` (Standardized Price Sample Entropy). Global Z-Score normalized Sample Entropy on close prices. Measures price predictability and trajectory complexity. Negative SPE_Z = predictable, regular price evolution. Positive SPE_Z = unpredictable, complex/noisy price evolution.
     - Regime Classification: RAW [WPE, SPE_Z] features are fed DIRECTLY into a Full-Covariance GMM (n=3, covariance_type='full') -- NO PowerTransform preprocessing. The GMM discovers the natural topological boundaries of entropy regimes. Labels are assigned by combined centroid magnitude (WPE_mean + SPE_Z_mean):
@@ -703,20 +702,18 @@ You analyze the market through three orthogonal risk vectors:
     - |V_WPE| near 0: "Entropy trajectory is stationary. No significant regime transition in progress."
     Example diagnostic: "Plane 1 classifies the market as Transitional. However, the kinematic XAI shows negative velocity (V_WPE=-0.03) with negative acceleration (a_WPE=-0.01) -- entropy is accelerating downward toward Deterministic (High Coordination). Structural fragility is rising. If prices are also rising, this is a late-stage momentum warning."
 
-- **Vector 2 (Volume Entropy, Weight 40%)**:
+- **Plane 2 (Volume Entropy)**:
     - Magnitude: `SampEn` (Sample Entropy) -- structural regularity of volume flow.
     - Scale: `Vol_Global_Z` -- absolute macro liquidity scale (Global Z-score of log-volume).
     - Distribution: `Shannon Entropy` -- concentration vs. dispersion of volume.
     - Interpretation: High SampEn + High Global Z = Climax Distribution (bubble peak). Low SampEn + Negative Z = Institutional Accumulation.
 
-- **Vector 3 (VN30 Cross-sectional Breadth, Weight 20%)**:
+- **VN30 Cross-sectional Breadth (supplementary)**:
     - `Corr_Entropy`: Eigenvalue decomposition of VN30 correlation matrix. Measures heavy-cap consensus.
     - `MFI`: Market Fragility Index = WPE * (1 - Complexity). Structural fragility proxy.
     - Logic: If Corr_Entropy > 0.7, the index is being propped up by a narrow set of heavyweight pillars. Flag as 'Structural Divergence' -- internal fragmentation preceding potential breakdown.
 
 ### 2. GARCH-X VOLATILITY ENGINE (Primary Risk Metric)
-
-The Composite Risk Score (weighted sum) has been replaced by GARCH(1,1)-X.
 
 **Variance equation:**
 σ²_t = ω + α·ε²_{t-1} + β·σ²_{t-1} + δ₁·H_price_{t-1} + δ₂·H_volume_{t-1}
@@ -747,7 +744,7 @@ Example: "ES 5% = -2.31% (raw), adjusted to -2.89% due to elevated cross-entropy
 2. compute_entropy_metrics
 3. compute_volume_entropy
 4. predict_market_regime + predict_volume_regime
-5. fit_garch_x  ← NEW (replaces Composite Risk step)
+5. fit_garch_x  (primary risk metric: sigma_t + ES)
 6. Synthesize narrative using σ_t + regime + δ coefficients + ES
 
 **Edge Cases — Adjust narrative accordingly:**
@@ -783,8 +780,8 @@ Example: "ES 5% = -2.31% (raw), adjusted to -2.89% due to elevated cross-entropy
 Before finalizing synthesis, execute an internal cross-plane critique:
 - If Plane 1 = "Deterministic" BUT Plane 2 = "Erratic/Dispersed" -> Flag as **HOLLOW RALLY (Bull Trap)**. Price entropy is dangerously low (strong directional force), but volume structure is fractured -- unsustainable.
 - If Plane 1 = "Stochastic" BUT Vol_Global_Z is NEGATIVE (below-average volume) -> Flag as **CAPITULATION VACUUM**. Price entropy is high (random walk) but driven by illiquidity, not genuine equilibrium.
-- If Global Z is POSITIVE (excess liquidity) BUT Composite Risk is HIGH -> Flag as **CLIMAX DISTRIBUTION** (peak FOMO).
-- "Which Vector is dominating the Composite Score? Is Vector 2 (Volume) contradicting Vector 1 (Price)? Re-evaluate now."
+- If Global Z is POSITIVE (excess liquidity) AND sigma_t is ELEVATED -> Flag as **CLIMAX DISTRIBUTION** (peak FOMO — institutional exit under cover of volume).
+- "Is Plane 2 (Volume) contradicting Plane 1 (Price)? Cross-plane divergence increases tail risk beyond what sigma_t alone captures."
 
 ### 4. XAI QUANTITATIVE CITATION RULES (MANDATORY)
 
@@ -851,7 +848,7 @@ def run_orchestrator(query: str, max_iters: int = 8):
     client = anthropic.Anthropic(api_key=api_key)
 
     messages = [{"role": "user", "content": query}]
-    print("Agent Orchestrator Started (Real API, Tri-Vector Composite)...")
+    print("Agent Orchestrator Started (Real API)...")
 
     for i in range(max_iters):
         print(f"\n--- Iteration {i+1} ---")
@@ -895,11 +892,11 @@ def run_orchestrator(query: str, max_iters: int = 8):
 
 
 # ==============================================================================
-# MOCK LLM (TESTING -- TRI-VECTOR COMPOSITE)
+# MOCK LLM (TESTING ONLY)
 # ==============================================================================
 def _run_mock_orchestrator(query: str):
-    """Mo phong ReAct loop, goi 5 tools va tong hop Composite Risk Score."""
-    print("\n  Agent Orchestrator Started (MOCK MODE, Tri-Vector Composite)...")
+    """TESTING ONLY. Mo phong ReAct loop: fetch -> entropy -> volume -> regime x2 -> GARCH-X."""
+    print("\n  Agent Orchestrator Started (MOCK MODE)...")
 
     # 1. Fetch Data
     print("\n--- Iteration 1 ---")
@@ -962,6 +959,6 @@ def _run_mock_orchestrator(query: str):
 # ==============================================================================
 if __name__ == "__main__":
     print("=" * 60)
-    print("TEST: Tri-Vector Composite Risk Agent Orchestrator")
+    print("TEST: Financial Entropy Agent Orchestrator")
     print("=" * 60)
-    run_orchestrator("Analyze VNINDEX structural integrity using the Tri-Vector Composite model.")
+    run_orchestrator("Analyze VNINDEX structural integrity using entropy regime classification and GARCH-X volatility.")

@@ -1,6 +1,6 @@
 """
-Financial Entropy Agent -- Tri-Vector Composite Risk Terminal
-Dual Pipeline (API/Upload), Entropy Phase Space GMM Scatter, Composite Risk Engine.
+Financial Entropy Agent -- Entropy Regime + GARCH Volatility Terminal
+Dual Pipeline (API/Upload), GMM Phase Space Scatter, GARCH-X Conditional Volatility.
 """
 
 import streamlit as st
@@ -434,7 +434,7 @@ vol_sh_kpi = f"{current_vol_shannon:.2f}" if pd.notna(current_vol_shannon) else 
 vol_se_kpi = f"{current_vol_sampen:.2f}" if pd.notna(current_vol_sampen) else "N/A"
 vol_gz_kpi = f"{current_vol_global_z:+.2f}" if pd.notna(current_vol_global_z) else "N/A"
 
-# Run Composite Risk Score
+# FALLBACK: entropy aggregate score used when GARCH unavailable (< 120 days)
 risk_score, synthesis_label, vector_info = calc_composite_risk_score(latest.to_dict(), df=df)
 contributions = vector_info.get("contributions", {})
 dominant_vector = vector_info.get("dominant_vector", "N/A")
@@ -585,7 +585,7 @@ with col1:
         st.markdown(f"<div style='text-align:center; font-size:0.72rem; color:#888; margin-top:4px; font-family:Courier Prime, monospace;'>{mult_explain}</div>", unsafe_allow_html=True)
 
     else:
-        # Fallback: Composite Risk Score cũ
+        # FALLBACK: entropy aggregate gauge (GARCH unavailable)
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge", value=risk_score,
             domain={'x': [0, 1], 'y': [0, 1]},

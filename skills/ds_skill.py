@@ -1,8 +1,9 @@
 """
 Data Science / ML Layer -- Financial Entropy Agent
-Phase Space Regime Classification: PowerTransform + Full-Covariance GMM.
-Plane 1 (Price): [WPE, SPE_Z] -> PowerTransform -> Full GMM -> Stable/Fragile/Chaos.
-Plane 2 (Volume): [Shannon, SampEn] -> PowerTransform -> GMM -> Consensus/Dispersed/Erratic.
+Phase Space Regime Classification via Full-Covariance GMM.
+Plane 1 (Price): [WPE, SPE_Z] -> Raw features -> Full GMM -> Deterministic/Transitional/Stochastic.
+Plane 2 (Volume): [Shannon, SampEn] -> PowerTransform -> Full GMM -> Consensus/Dispersed/Erratic.
+Note: Plane 1 uses NO preprocessing — raw entropy topology is preserved by design.
 """
 
 import logging
