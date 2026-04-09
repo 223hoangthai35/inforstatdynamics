@@ -92,10 +92,6 @@ class EntropyPhaseSpaceClassifier:
         """Chuyen semantic label thanh ten regime."""
         return REGIME_NAMES.get(label, f"Unknown_{label}")
 
-    def get_gmm_proba(self, features: np.ndarray) -> np.ndarray:
-        """Soft GMM probabilities."""
-        return self.gmm.predict_proba(features)
-
     def get_ellipse_params(self, cluster_idx: int, n_std: float = 2.0) -> dict:
         """
         Tinh tham so ellipse (95% confidence) cho cluster trong raw space.

@@ -169,35 +169,142 @@ This insight directly connects to the Type-2 chaos hypothesis that motivated the
 
 ---
 
-## Architecture Overview
+## Mathematical Foundation
+
+### Weighted Permutation Entropy (WPE)
+
+For a time series `{x_t}`, compute ordinal patterns of length `m` (embedding dimension) and weight each pattern by its amplitude variance:
 
 ```
-                        FINANCIAL ENTROPY AGENT
-                    =======================================
+WPE = - sum_pi [ w(pi) * log(w(pi)) ]
 
-                    [ RAW OHLCV & VN30 DATA ]
-                               |
-              +----------------+----------------+
-              |                                 |
-   [ ENTROPY FEATURE ENGINE ]      [ GARCH VOLATILITY ENGINE ]
-   WPE, SPE_Z, Vol_Shannon,       GARCH(1,1) + FHS
-   Vol_SampEn                      -> sigma_t, VaR 5%, ES 5%
-              |                                 |
-   [ GMM REGIME CLASSIFIER ]                   |
-   Deterministic / Transitional                 |
-   / Stochastic (no preprocessing)              |
-              |                                 |
-              +----------------+----------------+
-                               |
-                   [ REGIME x VOLATILITY ]
-                   sigma_adjusted = sigma_t x regime_multiplier
-                               |
-                   [ AI EXPLANATION LAYER ]
-                   Claude API -> Natural language
-                   risk narrative
-                               |
-                   [ STREAMLIT DASHBOARD ]
-                   Interactive terminal
+where:
+  pi     = ordinal pattern (permutation of m consecutive values)
+  w(pi)  = sum of variances of windows matching pattern pi
+         / total variance of all windows
+```
+
+**Parameters**: m=3, tau=1 (lag), window=22 days (1 trading month). The amplitude weighting distinguishes WPE from standard PE — large-amplitude patterns (panic moves, rallies) carry more weight than small random fluctuations.
+
+**Interpretation**: WPE in [0, log(m!)] normalized to [0, 1]. Low WPE = repeating ordinal patterns = coordinated, deterministic behavior. High WPE = diverse patterns = normal random market.
+
+### Sample Entropy (SampEn)
+
+SampEn measures the probability that two similar m-length templates remain similar at length m+1:
+
+```
+SampEn(m, r) = -log( A / B )
+
+where:
+  B = number of template pairs within tolerance r at length m
+  A = number of template pairs within tolerance r at length m+1
+  r = 0.2 * std(window)   (adaptive tolerance, 20% of local sigma)
+```
+
+**Parameters**: m=2, r=0.2*sigma, window=60 days. SPE_Z is the rolling Z-score of SampEn: `(SampEn_t - mean_t) / std_t`.
+
+**Interpretation**: Low SampEn = highly predictable price trajectory (low complexity). High SampEn = complex, irregular path (high complexity). Unlike WPE (ordinal structure), SampEn captures amplitude-space complexity.
+
+### Shannon Volume Entropy
+
+```
+H_Shannon = - sum_i [ p_i * log(p_i) ]
+
+where p_i = probability mass in bin i of the normalized volume distribution
+```
+
+Applied to rolling 60-day volume windows. Measures whether capital flow is concentrated (few dominant volume days → low entropy) or dispersed (uniform distribution → high entropy).
+
+### GMM Regime Classifier
+
+| Parameter | Value | Rationale |
+|:----------|:------|:----------|
+| n_components | 3 | Three regimes from physics analogy: ordered / transition / disordered |
+| covariance_type | full | Each cluster has its own shape and orientation — no isotropy assumption |
+| n_init | 10 | Multiple initializations to escape local optima |
+| Preprocessing | None (Plane 1) | Raw [WPE, SPE_Z] features — the natural scale carries physical meaning |
+| Features | [WPE, SPE_Z] | Two orthogonal entropy axes: ordinal disorder × trajectory complexity |
+
+The full covariance matrix allows GMM to discover the true geometric structure of entropy distributions — elongated, rotated clusters that axis-aligned covariance would miss.
+
+### GARCH(1,1) Variance Equation
+
+```
+sigma^2_t = omega + alpha * epsilon^2_{t-1} + beta * sigma^2_{t-1}
+
+where:
+  omega  = long-run variance floor
+  alpha  = reaction coefficient (sensitivity to shocks)
+  beta   = persistence coefficient (variance memory)
+  alpha + beta < 1  (stationarity constraint)
+```
+
+**Filtered Historical Simulation**: Rather than assuming Gaussian tails, standardized residuals `z_t = epsilon_t / sigma_t` are drawn from empirical historical distribution. VaR 5% and ES 5% are computed from quantiles of `sigma_t * z_{historical}`. This handles VNINDEX's fat tails and jump risk (circuit breakers, policy shocks) that parametric VaR cannot capture.
+
+---
+
+## Architecture Overview
+
+The system processes a single OHLCV stream through six sequential pipeline layers:
+
+```
+LAYER 1 — DATA INGESTION
+  skills/data_skill.py
+  vnstock (VNINDEX, VN30 constituents) + yfinance fallback
+  Output: OHLCV DataFrame, VN30 returns matrix
+
+LAYER 2 — ENTROPY FEATURE ENGINE
+  skills/quant_skill.py
+  WPE (m=3, tau=1, window=22)         — ordinal disorder in price returns
+  SPE_Z (m=2, r=0.2*sigma, window=60) — trajectory complexity, standardized
+  Vol_Shannon + Vol_SampEn (window=60) — liquidity structure entropy
+  Cross-sectional entropy (VN30)       — breadth / coordination signal
+  MFI                                  — money flow intensity
+  Output: entropy feature columns on df
+
+LAYER 3 — UNSUPERVISED REGIME CLASSIFIER
+  skills/ds_skill.py
+  Plane 1: Full-Cov GMM(n=3) on raw [WPE, SPE_Z]
+    -> Deterministic / Transitional / Stochastic
+  Plane 2: Full-Cov GMM(n=3) on [Vol_Shannon, Vol_SampEn]
+    -> Consensus Flow / Dispersed Flow / Erratic/Noisy Flow
+  No preprocessing, no normalization — discovers natural topology
+  Output: RegimeName, VolRegimeName columns on df
+
+LAYER 4 — CONDITIONAL VOLATILITY ENGINE
+  agent_orchestrator.py  fit_garch_x()
+  GARCH(1,1) fitted on full log-return history
+  Filtered Historical Simulation -> VaR 5%, ES 5%
+  Regime multiplier applied: sigma_adj = sigma_raw x multiplier
+    Stochastic: 1.0x  |  Transitional: 1.4x  |  Deterministic: 2.2x
+  Output: sigma_daily_pct, sigma_annual_pct, ES_5pct, ES_5pct_adjusted
+
+LAYER 5 — TRI-VECTOR COMPOSITE RISK SCORE
+  agent_orchestrator.py  calc_composite_risk_score()
+  V1 (40%): WPE, |SPE_Z|          — price structural fragility
+  V2 (40%): Vol_SampEn, |Vol_Global_Z|, Vol_Shannon — liquidity structure
+  V3 (20%): Cross-sectional entropy / 100, MFI      — market breadth
+  MinMaxScaler [0,1] per vector -> weighted sum x 100
+  Rolling 504-day P75/P90 thresholds -> STABLE / ELEVATED / CRITICAL
+  Output: composite score 0-100, alert level
+
+LAYER 6 — AI EXPLANATION LAYER
+  agent_orchestrator.py  ReAct loop (Claude API)
+  5-tool sequence: fetch -> entropy -> volume -> regime -> vol_regime
+  Synthesizes all layers into structured markdown risk narrative
+  Direction-aware: Deterministic + rally vs Deterministic + decline
+  Output: natural-language report for non-technical stakeholders
+```
+
+```
+skills/data_skill.py  ->  skills/quant_skill.py  ->  skills/ds_skill.py
+     LAYER 1                    LAYER 2                   LAYER 3
+                                     |
+                           agent_orchestrator.py
+                           LAYER 4 + 5 + 6 (ReAct)
+                                     |
+                               dashboard.py
+                           Streamlit + Plotly UI
 ```
 
 For detailed mathematical specifications, see [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -261,6 +368,41 @@ python validation/garch_forecast_eval.py
 ## Technical Requirements
 
 `numpy`, `pandas`, `numba` (JIT), `scikit-learn` (GMM), `scipy`, `arch` (GARCH), `statsmodels`, `plotly`, `streamlit`, `anthropic` (optional), `matplotlib`, `vnstock`, `yfinance`
+
+---
+
+## Generalization to Other Markets
+
+The system is designed as a market-agnostic entropy surveillance engine. VNINDEX is the validation market, not an architectural constraint.
+
+### What Is Market-Specific
+
+| Component | What changes | What stays the same |
+|:----------|:-------------|:--------------------|
+| Data source | `data_skill.py` — replace vnstock with Bloomberg/Reuters/yfinance | OHLCV schema |
+| Regime multipliers | 1.0 / 1.4 / 2.2 calibrated on VNINDEX tail behavior | Vector weights 40/40/20 |
+| GARCH fit | Refits on new market's return distribution automatically | Model specification |
+| VN30 breadth | Replace with S&P 500 constituents, FTSE 100, etc. | Eigenvalue decomposition logic |
+
+### Verifying the Entropy Paradox on a New Market
+
+The most important validation before deploying on a new market is to re-confirm that **low entropy = high risk** holds in that market's regime structure. This is not guaranteed — markets with different microstructure (e.g., thin frontier markets with high manipulation risk vs. deep liquid markets) may exhibit different entropy-risk relationships.
+
+**Recommended steps:**
+
+1. Run `validation/regime_validation.py` on the new market's data
+2. Check that the Kruskal-Wallis H-statistic is significant (p < 0.05)
+3. Check that the **ordering** of mean forward volatility matches: Deterministic > Transitional > Stochastic
+4. If ordering is inverted, the GMM cluster-to-regime mapping (`_cluster_to_regime` in `ds_skill.py`) needs to be re-calibrated for that market's entropy topology
+
+### Markets Where This Approach Is Well-Motivated
+
+The entropy framework is most applicable to markets exhibiting **Type-2 chaos characteristics**:
+- Markets with identifiable herding and momentum-following behavior
+- Markets where retail participation is high (coordinated behavior easier to detect)
+- Markets with sufficient history for GMM convergence (minimum ~500 trading days recommended)
+
+For deep, institutionally-dominated markets (e.g., US Treasuries), the Entropy Paradox may be weaker because arbitrage suppresses coordination faster. For frontier markets with thin liquidity, jump risk dominates and GARCH limitations (noted in V2) become more severe.
 
 ---
 

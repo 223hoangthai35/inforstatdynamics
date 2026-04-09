@@ -150,13 +150,6 @@ def calc_rolling_wpe(
 # ==============================================================================
 # PUBLIC API
 # ==============================================================================
-def calc_wpe_complexity(
-    x: np.ndarray, m: int = 3, tau: int = 1,
-) -> tuple[float, float]:
-    """Public wrapper: tinh WPE va Complexity cho 1 mang. Returns (H, C)."""
-    return _calc_wpe_complexity_jit(np.asarray(x, dtype=np.float64), m, tau)
-
-
 def calc_mfi(wpe: np.ndarray, complexity: np.ndarray) -> np.ndarray:
     """Market Fragility Index: MFI = WPE * (1 - C). Vectorized."""
     return wpe * (1.0 - complexity)

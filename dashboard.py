@@ -9,7 +9,7 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
-from datetime import datetime, timedelta
+from datetime import datetime
 import io
 
 # Import backend skills
@@ -452,6 +452,7 @@ elif "ELEVATED" in synthesis_label:
     risk_color = "#FF5F1F"
 else:
     risk_color = "#00FF41"
+risk_label_vn = synthesis_label
 
 # ==============================================================================
 # TOP KPI SECTION: GARCH-X PRIMARY + ES TAIL + REGIME SUMMARY
@@ -505,19 +506,35 @@ with col1:
         r_mult       = _garch_kpi.get("regime_multiplier", 1.0)
         r_source     = _garch_kpi.get("regime_mult_source", "")
 
-        # Risk level from σ_adjusted
-        if sigma_adj < 0.8:
-            risk_label_vn = T("CALM MARKET",   "THỊ TRƯỜNG ỔN ĐỊNH")
-            risk_color    = "#00FF41"
-        elif sigma_adj < 1.5:
-            risk_label_vn = T("MODERATE RISK", "RỦI RO TRUNG BÌNH")
-            risk_color    = "#FFD700"
-        elif sigma_adj < 2.5:
-            risk_label_vn = T("HIGH RISK",     "RỦI RO CAO")
-            risk_color    = "#FF5F1F"
+        # === VERDICT MATRIX: σ level × regime ===
+        regime_upper = current_regime.upper()
+        is_deterministic = "DETERMINISTIC" in regime_upper
+        is_stochastic = "STOCHASTIC" in regime_upper
+        
+        if sigma_adj >= 2.5:
+            if is_deterministic:
+                risk_label_vn = T("EXTREME RISK", "RỦI RO CỰC CAO")
+                risk_color = "#FF0000"
+            else:
+                risk_label_vn = T("ELEVATED VOLATILITY", "BIẾN ĐỘNG CAO")
+                risk_color = "#FF5F1F"  # cam, không đỏ
+        elif sigma_adj >= 1.5:
+            if is_deterministic:
+                risk_label_vn = T("HIGH RISK", "RỦI RO CAO")
+                risk_color = "#FF5F1F"
+            else:
+                risk_label_vn = T("MODERATE RISK", "RỦI RO TRUNG BÌNH")
+                risk_color = "#FFD700"
+        elif sigma_adj >= 0.8:
+            if is_deterministic:
+                risk_label_vn = T("STRUCTURAL WARNING", "CẢNH BÁO CẤU TRÚC")
+                risk_color = "#FFD700"
+            else:
+                risk_label_vn = T("MODERATE RISK", "RỦI RO TRUNG BÌNH")
+                risk_color = "#FFD700"
         else:
-            risk_label_vn = T("EXTREME RISK",  "RỦI RO CỰC CAO")
-            risk_color    = "#FF0000"
+            risk_label_vn = T("CALM MARKET", "THỊ TRƯỜNG ỔN ĐỊNH")
+            risk_color = "#00FF41"
 
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge",
@@ -596,7 +613,7 @@ with col1:
         )
         st.markdown(f'<div class="metric-label" style="text-align:center; padding-top:5px;">{T("COMPOSITE RISK SCORE", "ĐIỂM RỦI RO")}</div>', unsafe_allow_html=True)
         st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
-        st.markdown(f"<div style='text-align:center; color:{risk_color}; font-weight:800; font-size:1.0rem; margin-top:-15px;'>{synthesis_label}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align:center; color:{risk_color}; font-weight:800; font-size:1.0rem; margin-top:-15px;'>{risk_label_vn}</div>", unsafe_allow_html=True)
         if _garch_kpi and "error" in _garch_kpi and "arch" in str(_garch_kpi.get("error", "")).lower():
             st.markdown("<div style='text-align:center; font-size:0.68rem; color:#FF5F1F; margin-top:3px;'>pip install arch  →  enable GARCH-X</div>", unsafe_allow_html=True)
 
@@ -689,10 +706,98 @@ with col3:
     """, unsafe_allow_html=True)
 
 # ==============================================================================
+# UNSUPERVISED LEARNING PROOF -- DUAL-PLANE
+# ==============================================================================
+st.markdown("---")
+st.subheader(T("1. UNSUPERVISED REGIME DISCOVERY", "1. PHAT HIEN CHE DO KHONG GIAM SAT"))
+st.markdown(T(
+    "Step 1: GMM discovers natural market regimes from raw entropy features — no preprocessing, no human thresholds.",
+    "Buoc 1: GMM tim kiem che do thi truong tu nhien tu dac trung entropy — khong tien xu ly, khong nguong thu cong."
+))
+
+col_price_plot, col_vol_plot = st.columns([1, 1])
+
+# --- PLOT 1: Price Dynamics Plane (Raw Entropy Phase Space) ---
+with col_price_plot:
+    st.markdown(f"**{T('PLANE 1: RAW ENTROPY PHASE SPACE', 'MAT PHANG 1: KHONG GIAN PHA ENTROPY (RAW)')}**")
+    plot_df = df.dropna(subset=['WPE', 'SPE_Z', 'RegimeName'])
+    if not plot_df.empty:
+        color_map_price = {
+            "Stochastic":    "#00FF41",   # green  — normal market
+            "Transitional":  "#FFD700",   # yellow — mixed structure
+            "Deterministic": "#FF0000",   # red    — high coordination
+        }
+        scatter_price = px.scatter(
+            plot_df, x="WPE", y="SPE_Z",
+            color="RegimeName",
+            color_discrete_map=color_map_price,
+            hover_data=["Close", "MFI"],
+            labels={"WPE": "WPE (Weighted Permutation Entropy)", "SPE_Z": "SPE_Z (Standardized Price Sample Entropy)"},
+        )
+
+        # 95% Confidence Ellipses (Full GMM: unique shape per cluster, RAW space)
+        if price_clf is not None:
+            try:
+                regime_colors = {0: "#00FF41", 1: "#FFD700", 2: "#FF0000"}
+                t_arr = np.linspace(0, 2 * np.pi, 100)
+                for cluster_idx in range(price_clf.n_components):
+                    ell = price_clf.get_ellipse_params(cluster_idx, n_std=2.0)
+                    regime_idx = price_clf._cluster_to_regime.get(cluster_idx, cluster_idx)
+                    cos_a = np.cos(np.radians(ell["angle"]))
+                    sin_a = np.sin(np.radians(ell["angle"]))
+                    x_ell = (ell["width"] / 2) * np.cos(t_arr)
+                    y_ell = (ell["height"] / 2) * np.sin(t_arr)
+                    x_rot = cos_a * x_ell - sin_a * y_ell + ell["center"][0]
+                    y_rot = sin_a * x_ell + cos_a * y_ell + ell["center"][1]
+                    scatter_price.add_trace(go.Scatter(
+                        x=x_rot, y=y_rot, mode='lines',
+                        line=dict(color=regime_colors.get(regime_idx, "white"), width=1.5, dash='dash'),
+                        showlegend=False, hoverinfo='skip',
+                    ))
+            except Exception:
+                pass
+
+        scatter_price.update_layout(
+            template="plotly_dark", plot_bgcolor='#0E1117', paper_bgcolor='#0E1117',
+            legend_title="Price Regime (Raw Full GMM)",
+            margin=dict(l=20, r=20, b=20, t=20), height=450,
+        )
+        st.plotly_chart(scatter_price, use_container_width=True)
+
+# --- PLOT 2: Volume Entropy Plane ---
+with col_vol_plot:
+    st.markdown(f"**{T('PLANE 2: LIQUIDITY STRUCTURE', 'MẶT PHẲNG 2: CẤU TRÚC THANH KHOẢN')}**")
+    vol_plot_df = df.dropna(subset=['Vol_Shannon', 'Vol_SampEn', 'VolRegimeName'])
+    if not vol_plot_df.empty:
+        color_map_vol = {
+            "Consensus Flow": "#1E90FF",
+            "Dispersed Flow": "#BA55D3",
+            "Erratic/Noisy Flow": "#FF6347",
+        }
+        scatter_vol = px.scatter(
+            vol_plot_df, x="Vol_Shannon", y="Vol_SampEn",
+            color="VolRegimeName",
+            color_discrete_map=color_map_vol,
+            hover_data=["Close", "Volume"],
+            labels={"Vol_Shannon": "Shannon Entropy (Concentration)", "Vol_SampEn": "Sample Entropy (Impulse Regularity)"},
+        )
+        scatter_vol.update_layout(
+            template="plotly_dark", plot_bgcolor='#0E1117', paper_bgcolor='#0E1117',
+            legend_title="Volume Regime",
+            margin=dict(l=20, r=20, b=20, t=20), height=450,
+        )
+        st.plotly_chart(scatter_vol, use_container_width=True)
+    else:
+        st.info(T("Volume Entropy data requires minimum 60 trading days.", "Du lieu Volume Entropy can toi thieu 60 ngay giao dich."))
+# ==============================================================================
 # VISUALS: Market Structure
 # ==============================================================================
 st.markdown("---")
-st.subheader(T("1. MARKET STRUCTURE", "1. CẤU TRÚC THỊ TRƯỜNG"))
+st.subheader(T("2. MARKET STRUCTURE TIMELINE", "2. DONG THOI GIAN CAU TRUC THI TRUONG"))
+st.markdown(T(
+    "Step 2: Regime labels applied to market history — coordination patterns visible across 6 years of VNINDEX.",
+    "Buoc 2: Nhan che do ap dung vao lich su thi truong — mo hinh phoi hop quan sat qua 6 nam du lieu VNINDEX."
+))
 
 fig1 = make_subplots(
     rows=2, cols=1, 
@@ -869,90 +974,6 @@ fig2.update_layout(
 fig2.update_xaxes(rangeslider_visible=False)
 st.plotly_chart(fig2, use_container_width=True)
 
-# ==============================================================================
-# UNSUPERVISED LEARNING PROOF -- DUAL-PLANE
-# ==============================================================================
-st.markdown("---")
-st.subheader(T("2. UNSUPERVISED LEARNING: DUAL-PLANE DS PROOF", "2. BANG CHUNG HOC MAY: HAI MAT PHANG ENTROPY"))
-st.markdown(T(
-    "Plane 1: Raw Full GMM Phase Space (X=WPE, Y=SPE_Z, no transform). Plane 2: Volume GMM (X=Shannon, Y=SampEn).",
-    "Mat phang 1: Raw Full GMM Phase Space (X=WPE, Y=SPE_Z, khong transform). Mat phang 2: Volume GMM (X=Shannon, Y=SampEn)."
-))
-
-col_price_plot, col_vol_plot = st.columns([1, 1])
-
-# --- PLOT 1: Price Dynamics Plane (Raw Entropy Phase Space) ---
-with col_price_plot:
-    st.markdown(f"**{T('PLANE 1: RAW ENTROPY PHASE SPACE', 'MAT PHANG 1: KHONG GIAN PHA ENTROPY (RAW)')}**")
-    plot_df = df.dropna(subset=['WPE', 'SPE_Z', 'RegimeName'])
-    if not plot_df.empty:
-        color_map_price = {
-            "Stochastic":    "#00FF41",   # green  — normal market
-            "Transitional":  "#FFD700",   # yellow — mixed structure
-            "Deterministic": "#FF0000",   # red    — high coordination
-        }
-        scatter_price = px.scatter(
-            plot_df, x="WPE", y="SPE_Z",
-            color="RegimeName",
-            color_discrete_map=color_map_price,
-            hover_data=["Close", "MFI"],
-            labels={"WPE": "WPE (Weighted Permutation Entropy)", "SPE_Z": "SPE_Z (Standardized Price Sample Entropy)"},
-        )
-
-        # 95% Confidence Ellipses (Full GMM: unique shape per cluster, RAW space)
-        if price_clf is not None:
-            try:
-                regime_colors = {0: "#00FF41", 1: "#FFD700", 2: "#FF0000"}
-                t_arr = np.linspace(0, 2 * np.pi, 100)
-                for cluster_idx in range(price_clf.n_components):
-                    ell = price_clf.get_ellipse_params(cluster_idx, n_std=2.0)
-                    regime_idx = price_clf._cluster_to_regime.get(cluster_idx, cluster_idx)
-                    cos_a = np.cos(np.radians(ell["angle"]))
-                    sin_a = np.sin(np.radians(ell["angle"]))
-                    x_ell = (ell["width"] / 2) * np.cos(t_arr)
-                    y_ell = (ell["height"] / 2) * np.sin(t_arr)
-                    x_rot = cos_a * x_ell - sin_a * y_ell + ell["center"][0]
-                    y_rot = sin_a * x_ell + cos_a * y_ell + ell["center"][1]
-                    scatter_price.add_trace(go.Scatter(
-                        x=x_rot, y=y_rot, mode='lines',
-                        line=dict(color=regime_colors.get(regime_idx, "white"), width=1.5, dash='dash'),
-                        showlegend=False, hoverinfo='skip',
-                    ))
-            except Exception:
-                pass
-
-        scatter_price.update_layout(
-            template="plotly_dark", plot_bgcolor='#0E1117', paper_bgcolor='#0E1117',
-            legend_title="Price Regime (Raw Full GMM)",
-            margin=dict(l=20, r=20, b=20, t=20), height=450,
-        )
-        st.plotly_chart(scatter_price, use_container_width=True)
-
-# --- PLOT 2: Volume Entropy Plane ---
-with col_vol_plot:
-    st.markdown(f"**{T('PLANE 2: LIQUIDITY STRUCTURE', 'MẶT PHẲNG 2: CẤU TRÚC THANH KHOẢN')}**")
-    vol_plot_df = df.dropna(subset=['Vol_Shannon', 'Vol_SampEn', 'VolRegimeName'])
-    if not vol_plot_df.empty:
-        color_map_vol = {
-            "Consensus Flow": "#1E90FF",
-            "Dispersed Flow": "#BA55D3",
-            "Erratic/Noisy Flow": "#FF6347",
-        }
-        scatter_vol = px.scatter(
-            vol_plot_df, x="Vol_Shannon", y="Vol_SampEn",
-            color="VolRegimeName",
-            color_discrete_map=color_map_vol,
-            hover_data=["Close", "Volume"],
-            labels={"Vol_Shannon": "Shannon Entropy (Concentration)", "Vol_SampEn": "Sample Entropy (Impulse Regularity)"},
-        )
-        scatter_vol.update_layout(
-            template="plotly_dark", plot_bgcolor='#0E1117', paper_bgcolor='#0E1117',
-            legend_title="Volume Regime",
-            margin=dict(l=20, r=20, b=20, t=20), height=450,
-        )
-        st.plotly_chart(scatter_vol, use_container_width=True)
-    else:
-        st.info(T("Volume Entropy data requires minimum 60 trading days.", "Du lieu Volume Entropy can toi thieu 60 ngay giao dich."))
 
 st.markdown("---")
 st.subheader(T("3. RISK INTELLIGENCE REPORT", "3. BAO CAO PHAN TICH RUI RO"))
@@ -982,24 +1003,6 @@ if _garch_ok:
     d_hv = _garch_kpi.get("delta_H_volume", 0)
     entropy_status = _garch_kpi.get("entropy_status",
                       "ACTIVE" if garch_type == "GARCH-X" else "DORMANT")
-
-# Risk level label
-if sigma_adj < 0.8:
-    risk_verdict = T("LOW RISK -- Market structure is healthy", 
-                     "RUI RO THAP -- Cau truc thi truong lanh manh")
-    risk_verdict_color = "#00FF41"
-elif sigma_adj < 1.5:
-    risk_verdict = T("MODERATE RISK -- Structural stress detected",
-                     "RUI RO TRUNG BINH -- Phat hien cang thang cau truc")
-    risk_verdict_color = "#FFD700"
-elif sigma_adj < 2.5:
-    risk_verdict = T("HIGH RISK -- Significant structural deterioration",
-                     "RUI RO CAO -- Suy giam cau truc dang ke")
-    risk_verdict_color = "#FF5F1F"
-else:
-    risk_verdict = T("EXTREME RISK -- Systemic breakdown in progress",
-                     "RUI RO CUC CAO -- He thong dang sup do")
-    risk_verdict_color = "#FF0000"
 
 # === SECTION A: VOLATILITY ANALYSIS ===
 if _garch_ok:
@@ -1143,6 +1146,10 @@ else:
         "hoac dau co qua muc."
     )
 
+# Đảm bảo Conclusion section dùng chung biến với Gauge để đồng nhất
+risk_verdict = risk_label_vn
+risk_verdict_color = risk_color
+
 # Cross-plane divergence check
 divergence_alert = ""
 if "DETERMINISTIC" in regime_upper and ("DISPERSED" in vol_regime_upper or "ERRATIC" in vol_regime_upper):
@@ -1162,26 +1169,43 @@ elif "STOCHASTIC" in regime_upper and current_vol_global_z < 0:
         "Su binh lang la do thieu thanh khoan, khong phai can bang thuc su. Thi truong mong = rui ro gap."
     )
 
-# Regime multiplier explanation
+# Regime multiplier explanation — differentiate source of amplification
 if r_mult > 1.0:
-    mult_explain = T(
-        f"Because the market is in **{current_regime}** price regime and "
-        f"**{current_vol_regime_name}** volume regime, the base volatility "
-        f"({sigma_raw:.3f}%) is amplified by {r_mult:.1f}x to "
-        f"**{sigma_adj:.3f}%** -- reflecting the structural stress that "
-        f"entropy regimes have identified.",
-        f"Vi thi truong dang o che do gia **{current_regime}** va "
-        f"che do thanh khoan **{current_vol_regime_name}**, bien dong goc "
-        f"({sigma_raw:.3f}%) duoc nhan {r_mult:.1f}x thanh "
-        f"**{sigma_adj:.3f}%** -- phan anh cang thang cau truc ma "
-        f"che do entropy da xac dinh."
-    )
+    if "STOCHASTIC" in regime_upper:
+        # Amplification comes from volume regime only; price structure is healthy
+        mult_explain = T(
+            f"Base GARCH volatility is **{sigma_raw:.3f}%** (annualized {sigma_annual:.1f}%). "
+            f"Price structure is **Stochastic** (healthy — no amplification from price regime). "
+            f"The {r_mult:.1f}x multiplier comes from the **{current_vol_regime_name}** volume regime: "
+            f"fragmented capital flow increases gap risk even when price entropy is normal. "
+            f"Adjusted daily volatility: **{sigma_adj:.3f}%**. "
+            f"Note: this is a liquidity-driven spike, not a systemic structural breakdown.",
+            f"Bien dong GARCH co so la **{sigma_raw:.3f}%** (quy nam {sigma_annual:.1f}%). "
+            f"Cau truc gia la **Stochastic** (lanh manh — khong nhan he so tu che do gia). "
+            f"He so {r_mult:.1f}x den tu che do khoi luong **{current_vol_regime_name}**: "
+            f"dong von phan tan lam tang rui ro gap du entropy gia binh thuong. "
+            f"Bien dong hang ngay dieu chinh: **{sigma_adj:.3f}%**. "
+            f"Luu y: day la dot tang do thanh khoan, khong phai khung hoang cau truc he thong."
+        )
+    else:
+        mult_explain = T(
+            f"Because the market is in **{current_regime}** price regime and "
+            f"**{current_vol_regime_name}** volume regime, the base volatility "
+            f"({sigma_raw:.3f}%) is amplified by {r_mult:.1f}x to "
+            f"**{sigma_adj:.3f}%** -- reflecting structural coordination pressure "
+            f"detected by the entropy regime classifier.",
+            f"Vi thi truong dang o che do gia **{current_regime}** va "
+            f"che do thanh khoan **{current_vol_regime_name}**, bien dong goc "
+            f"({sigma_raw:.3f}%) duoc nhan {r_mult:.1f}x thanh "
+            f"**{sigma_adj:.3f}%** -- phan anh ap luc phoi hop cau truc "
+            f"duoc phat hien boi bo phan loai entropy."
+        )
 else:
     mult_explain = T(
         f"Both price and volume regimes are stable -- no regime amplification applied. "
-        f"The base volatility of {sigma_raw:.3f}% reflects the full risk picture.",
+        f"The base volatility of {sigma_raw:.3f}% (annualized {sigma_annual:.1f}%) reflects the full risk picture.",
         f"Ca che do gia va thanh khoan deu on dinh -- khong can nhan he so regime. "
-        f"Bien dong goc {sigma_raw:.3f}% phan anh day du buc tranh rui ro."
+        f"Bien dong goc {sigma_raw:.3f}% (quy nam {sigma_annual:.1f}%) phan anh day du buc tranh rui ro."
     )
 
 # === SECTION C: XAI TRAJECTORY ===
@@ -1249,21 +1273,226 @@ if _garch_ok:
 else:
     tail_para = ""
 
-# === RENDER THE REPORT ===
-verdict_html = f"""
-<div style="border-left: 5px solid {risk_verdict_color}; background: rgba(0,0,0,0.3); 
-            padding: 20px 25px; border-radius: 4px; margin-bottom: 20px;">
-    <div style="color: {risk_verdict_color}; font-size: 1.3rem; font-weight: 800; 
-                font-family: 'Courier Prime', monospace; margin-bottom: 8px;">
-        {risk_verdict}
-    </div>
-    <div style="color: #e0e0e0; font-size: 1.0rem; line-height: 1.6; font-weight: 400;">
-        {mult_explain}
-    </div>
-</div>
-"""
-st.markdown(verdict_html, unsafe_allow_html=True)
+# === SECTION E: CONCLUSION (plain-language synthesis) ===
+_etrend = "rising" if v_wpe_val > 0.005 else ("falling" if v_wpe_val < -0.005 else "stable")
+_vl = current_vol_regime_name  # short alias
+_vl_note = T(
+    f"Volume is **{_vl}** — {'institutional capital is moving in an organized manner, supporting the current direction' if 'Consensus' in _vl else 'capital flow is fragmented with no clear institutional direction' if 'Dispersed' in _vl else 'liquidity is erratic — unpredictable capital flows add additional tail risk'}.",
+    f"Khoi luong la **{_vl}** — {'dong von to chuc di chuyen co to chuc, ho tro huong hien tai' if 'Consensus' in _vl else 'dong von phan tan, khong co huong ro rang cua to chuc' if 'Dispersed' in _vl else 'thanh khoan bat quy tac — dong von khong du doan duoc lam tang rui ro duoi'}."
+)
 
+if "STOCHASTIC" in regime_upper:
+    if _etrend == "rising":
+        conclusion_main = T(
+            f"**The market is in a healthy state and improving.** "
+            f"Current daily volatility is **{sigma_adj:.2f}%** — no regime amplification needed. "
+            f"Price movements are diverse and unpredictable, meaning no single group is dominating. "
+            f"Think of it as a healthy crowd: everyone has a different opinion, different strategy, "
+            f"and buys or sells for different reasons. That diversity is what keeps markets stable. "
+            f"Entropy is rising, so structural health is strengthening further. {_vl_note}",
+            f"**Thi truong o trang thai lanh manh va cai thien.** "
+            f"Bien dong hang ngay hien tai la **{sigma_adj:.2f}%** — khong can nhan he so regime. "
+            f"Cac bien dong gia da dang, khong co nhom nao chiem uu the. "
+            f"Entropy dang tang, suc khoe cau truc dang manh len. {_vl_note}"
+        )
+        conclusion_watch = T(
+            "No structural warnings. Standard risk management applies. "
+            "If entropy begins to decline, it signals early coordination build-up — monitor.",
+            "Khong co canh bao cau truc. Quan ly rui ro tieu chuan ap dung. "
+            "Neu entropy bat dau giam, day la tin hieu phoi hop som — theo doi."
+        )
+    elif _etrend == "falling":
+        conclusion_main = T(
+            f"**The market is healthy today, but structural coordination is quietly building.** "
+            f"Current daily volatility is **{sigma_adj:.2f}%**. Price regime is Stochastic (normal), "
+            f"but entropy is declining — the diversity of market behavior is shrinking. "
+            f"Think of it like a crowd where everyone is doing different things, but slowly "
+            f"starting to move the same direction. No alarm yet, but this is how risk builds "
+            f"before it becomes visible. {_vl_note}",
+            f"**Thi truong hom nay lanh manh, nhung su phoi hop cau truc dang am tham hinh thanh.** "
+            f"Bien dong hang ngay hien tai la **{sigma_adj:.2f}%**. Che do gia la Stochastic (binh thuong), "
+            f"nhung entropy dang giam — su da dang cua hanh vi thi truong dang thu hep. {_vl_note}"
+        )
+        conclusion_watch = T(
+            "Early warning: watch entropy trend over the next 5–10 days. "
+            "Entry into Transitional regime = tighten risk parameters.",
+            "Canh bao som: theo doi xu huong entropy trong 5–10 ngay. "
+            "Vao pha Transitional = siet chat tham so rui ro."
+        )
+    else:
+        conclusion_main = T(
+            f"**The market is in a healthy, stable state.** "
+            f"Current daily volatility is **{sigma_adj:.2f}%** with no regime amplification. "
+            f"Diverse participants, diverse strategies — no unusual coordination detected. "
+            f"Entropy is stationary, meaning the current healthy structure is stable. {_vl_note}",
+            f"**Thi truong o trang thai lanh manh, on dinh.** "
+            f"Bien dong hang ngay hien tai la **{sigma_adj:.2f}%** khong co nhan he so regime. "
+            f"Nhieu thanh vien, nhieu chien luoc — khong phat hien phoi hop bat thuong. {_vl_note}"
+        )
+        conclusion_watch = T(
+            "No structural alerts. Normal risk management applies.",
+            "Khong co canh bao cau truc. Quan ly rui ro tieu chuan ap dung."
+        )
+
+elif "TRANSITIONAL" in regime_upper:
+    if _etrend == "rising":
+        conclusion_main = T(
+            f"**The market is in a transitional phase and conditions are improving.** "
+            f"Current daily volatility is **{sigma_adj:.2f}%** (1.4× base — Transitional regime adds a stress premium). "
+            f"The market is between ordered and disordered states, but entropy is rising — "
+            f"the mixed structure is dissolving back toward healthy conditions. "
+            f"For an investor: risk is moderate but the trend is positive. "
+            f"The next likely transition is toward Stochastic (lower risk). {_vl_note}",
+            f"**Thi truong dang o pha chuyen tiep va dieu kien dang cai thien.** "
+            f"Bien dong hang ngay hien tai la **{sigma_adj:.2f}%** (1.4× co so). "
+            f"Thi truong dang giua trang thai co trat tu va khong co trat tu, nhung entropy dang tang. "
+            f"Rui ro trung binh, xu huong tich cuc. {_vl_note}"
+        )
+        conclusion_watch = T(
+            "Positive trend. Watch for regime confirmation into Stochastic within 10–15 trading sessions.",
+            "Xu huong tich cuc. Theo doi xac nhan chuyen sang Stochastic trong 10–15 phien giao dich."
+        )
+    elif _etrend == "falling":
+        conclusion_main = T(
+            f"**The market is in a transitional phase and deteriorating — this is an early warning.** "
+            f"Current daily volatility is **{sigma_adj:.2f}%** (1.4× base). "
+            f"Entropy is falling: structural coordination is intensifying. "
+            f"If this continues, the market will enter the Deterministic regime, where "
+            f"volatility is amplified 2.2× and tail risk is at its highest. "
+            f"For an investor: this is the optimal time to review position sizes and ensure "
+            f"stop-losses are in place — before the situation escalates. {_vl_note}",
+            f"**Thi truong dang o pha chuyen tiep va xau di — canh bao som.** "
+            f"Bien dong hang ngay hien tai la **{sigma_adj:.2f}%** (1.4× co so). "
+            f"Entropy dang giam: su phoi hop cau truc dang tang. Neu tiep tuc, thi truong se vao "
+            f"regime Deterministic voi bien dong 2.2× va rui ro duoi cao nhat. "
+            f"Day la luc kiem tra lai quy mo vi the. {_vl_note}"
+        )
+        conclusion_watch = T(
+            "Early warning: watch for WPE dropping below 0.70 — that signals Deterministic entry. "
+            "Review stops now, not after the transition.",
+            "Canh bao som: WPE giam duoi 0.70 = tin hieu vao Deterministic. "
+            "Kiem tra stop-loss ngay bay gio, khong phai sau chuyen tiep."
+        )
+    else:
+        conclusion_main = T(
+            f"**The market is in a transitional phase with no clear directional signal.** "
+            f"Current daily volatility is **{sigma_adj:.2f}%** (1.4× base). "
+            f"Risk is moderate. The market is at a structural crossroads: "
+            f"entropy flat means neither improvement nor deterioration is confirmed. "
+            f"The next 5–10 sessions will determine which direction this resolves. {_vl_note}",
+            f"**Thi truong o pha chuyen tiep khong co tin hieu dinh huong ro rang.** "
+            f"Bien dong hang ngay hien tai la **{sigma_adj:.2f}%** (1.4× co so). Rui ro trung binh. "
+            f"Thi truong o nga tu cau truc. {_vl_note}"
+        )
+        conclusion_watch = T(
+            "Watch for entropy direction over next 5 sessions: rising = improving, falling = escalating.",
+            "Theo doi huong entropy trong 5 phien toi: tang = cai thien, giam = leo thang."
+        )
+
+else:  # DETERMINISTIC
+    if _price_above_sma20:
+        if _etrend == "rising":
+            conclusion_main = T(
+                f"**The coordinated rally is showing signs of unwinding.** "
+                f"Current daily volatility is **{sigma_adj:.2f}%** — amplified 2.2× by Deterministic regime. "
+                f"Prices are above the 20-day moving average (uptrend), and the move has been driven "
+                f"by synchronized buying — herding behavior. However, entropy is now rising, "
+                f"meaning participants are beginning to act independently again. "
+                f"Think of a crowd that was all running the same direction starting to scatter: "
+                f"the peak coordination danger may have passed, but the structure remains fragile. "
+                f"For an investor: do not add to positions until a full Transitional regime entry confirms stabilization. {_vl_note}",
+                f"**Da tang phoi hop dang co dau hieu tan ra.** "
+                f"Bien dong hang ngay hien tai la **{sigma_adj:.2f}%** — duoc nhan 2.2× boi regime Deterministic. "
+                f"Gia tren duong trung binh 20 ngay, bien dong duoc thuc day boi viec mua dong bo. "
+                f"Tuy nhien, entropy dang tang — nguoi tham gia bat dau hanh dong doc lap tro lai. "
+                f"Dinh phoi hop co the da qua nhung cau truc van con gion. "
+                f"Voi nha dau tu: khong tang vi the cho den khi vao Transitional xac nhan. {_vl_note}"
+            )
+            conclusion_watch = T(
+                "Improving from peak fragility. Confirm: wait for full Transitional entry before adding risk.",
+                "Cai thien tu muc gion nat cao nhat. Xac nhan: cho Transitional truoc khi tang rui ro."
+            )
+        else:
+            conclusion_main = T(
+                f"**HIGHEST STRUCTURAL RISK: Late-stage coordinated rally.** "
+                f"Current daily volatility is **{sigma_adj:.2f}%** — amplified 2.2× by Deterministic regime. "
+                f"Prices are rising above the 20-day average, but the move is entirely driven by "
+                f"herding: everyone is buying for the same reason at the same time. "
+                f"**This is structurally the most dangerous condition in an uptrend.** "
+                f"When a crowd is all moving the same direction, a single trigger can cause a "
+                f"cascade reversal — and the higher prices have gone in this state, "
+                f"the sharper the eventual correction. "
+                f"{'The volume structure (' + _vl + ') adds further concern — price coordination without volume support is unsustainable.' if 'Dispersed' in _vl or 'Erratic' in _vl else 'Volume shows institutional activity, but institutional consensus in a Deterministic state means concentrated exit risk when the view changes.'} "
+                f"For an investor: this is not a signal to sell immediately, but it is a signal "
+                f"that the market is running on coordination rather than fundamentals. "
+                f"Any negative catalyst will have outsized impact.",
+                f"**RUI RO CAU TRUC CAO NHAT: Da tang phoi hop giai doan cuoi.** "
+                f"Bien dong hang ngay hien tai la **{sigma_adj:.2f}%** — duoc nhan 2.2× boi Deterministic. "
+                f"Gia tang tren duong trung binh 20 ngay nhung hoan toan do herd behavior thuc day. "
+                f"Khi tat ca cung mua vi cung ly do, mot su kien tieu cuc co the gay dao chieu bao. "
+                f"Voi nha dau tu: khong phai tin hieu ban ngay, nhung la tin hieu thi truong dang chay bang "
+                f"su phoi hop thay vi nen tang. Bat ky tin xau nao se co tac dong lon hon binh thuong."
+            )
+            conclusion_watch = T(
+                "CRITICAL: Any negative catalyst = outsized downside. "
+                "Watch WPE for rising entropy as the first exit signal.",
+                "NGHIEM TRONG: Bat ky tin xau = giam manh. "
+                "Theo doi WPE tang — do la tin hieu thoat dau tien."
+            )
+    else:  # below SMA20 = decline
+        if _etrend == "rising":
+            conclusion_main = T(
+                f"**The coordinated decline may be easing — first stabilization signal.** "
+                f"Current daily volatility is **{sigma_adj:.2f}%** — amplified 2.2× by Deterministic regime. "
+                f"Prices are below the 20-day average (downtrend), and the recent selling has been "
+                f"synchronized — institutional distribution or panic. "
+                f"However, entropy is now rising: the coordination of selling is losing intensity. "
+                f"Think of panic as a crowd all fleeing the same exit — when people start "
+                f"taking different paths, the stampede loses momentum. "
+                f"This is the first structural signal that the acute phase may be passing. "
+                f"For an investor: remain cautious, but watch for Transitional entry to confirm floor. {_vl_note}",
+                f"**Da giam phoi hop co the dang giam nhe — tin hieu on dinh dau tien.** "
+                f"Bien dong hang ngay hien tai la **{sigma_adj:.2f}%** — duoc nhan 2.2×. "
+                f"Gia duoi duong trung binh 20 ngay, viec ban da dong bo. "
+                f"Tuy nhien, entropy dang tang: su phoi hop ban dang mat cuong do. "
+                f"Day la tin hieu cau truc dau tien cho thay pha cap tinh co the dang qua. {_vl_note}"
+            )
+            conclusion_watch = T(
+                "Positive signal: panic easing. Watch for Transitional regime entry to confirm floor.",
+                "Tin hieu tich cuc: hoang loan dang giam. Theo doi vao Transitional de xac nhan day."
+            )
+        else:
+            _es_line = f" Worst-case expected daily loss (5% probability): **{es_5:+.2f}%**." if tail_para else ""
+            conclusion_main = T(
+                f"**HIGHEST STRUCTURAL RISK: Coordinated decline — panic or institutional distribution.** "
+                f"Current daily volatility is **{sigma_adj:.2f}%** — amplified 2.2× by Deterministic regime. "
+                f"Prices are below the 20-day average and falling in a synchronized manner. "
+                f"This is the structural signature of organized selling: either institutions are "
+                f"systematically offloading positions, or retail panic has created a self-reinforcing "
+                f"cascade where falling prices trigger more selling. "
+                f"**Entropy is still falling — the coordination is intensifying, not easing.** "
+                f"When capital exits in a coordinated fashion, downside moves are large and fast.{_es_line} "
+                f"For an investor: this is the highest-risk structural state. "
+                f"Reduce exposure if positions exceed your risk tolerance. "
+                f"Do not average down until you see entropy stabilize — catching a falling "
+                f"knife in a Deterministic decline is the most common way investors magnify losses.",
+                f"**RUI RO CAU TRUC CAO NHAT: Da giam phoi hop — hoang loan hoac ban to chuc.** "
+                f"Bien dong hang ngay hien tai la **{sigma_adj:.2f}%** — duoc nhan 2.2× boi Deterministic. "
+                f"Gia duoi duong trung binh 20 ngay va dang giam theo cach dong bo. "
+                f"Day la dau hieu cau truc cua viec ban co to chuc hoac hoang loan ban le. "
+                f"**Entropy van dang giam — su phoi hop dang tang cuong, khong giam.** "
+                f"Khi von rut ra dong bo, bien dong giam lon va nhanh.{_es_line} "
+                f"Voi nha dau tu: day la trang thai rui ro cao nhat. Giam phoi hop. "
+                f"Khong trung binh gia xuong cho den khi entropy on dinh."
+            )
+            conclusion_watch = T(
+                "CRITICAL: Do not add exposure. First safety signal = entropy stops falling. "
+                "Wait for Transitional entry before considering any re-entry.",
+                "NGHIEM TRONG: Khong tang vi the. Tin hieu an toan dau tien = entropy ngung giam. "
+                "Cho Transitional truoc khi can nhac tai nhap."
+            )
+
+# === RENDER THE REPORT ===
 # Analysis cards
 st.markdown(f"""
 <div class="analysis-card">
@@ -1297,14 +1526,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-if divergence_alert:
-    st.markdown(f"""
-    <div style="border: 2px solid #FF5F1F; background: rgba(255,95,31,0.08); 
-                padding: 15px 20px; border-radius: 6px; margin: 12px 0;">
-        <div class="analysis-text" style="color: #FFB088;">{divergence_alert}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
 st.markdown(f"""
 <div class="analysis-card">
     <div class="analysis-card-title">{T('4. Entropy Momentum', '4. Da Entropy')}</div>
@@ -1323,6 +1544,38 @@ if tail_para:
     <div class="analysis-card">
         <div class="analysis-card-title">{T('5. Tail Risk Assessment', '5. Danh gia Rui ro Duoi')}</div>
         <div class="analysis-text">{tail_para}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# === CONCLUSION CARD ===
+st.markdown(f"""
+<div class="analysis-card">
+    <div class="analysis-card-title">{T('CONCLUSION', 'KET LUAN')}</div>
+    <div style="color: {risk_verdict_color}; font-size: 1.08rem; font-weight: 800;
+                font-family: 'Courier Prime', monospace; margin-bottom: 12px;">
+        {risk_verdict}
+    </div>
+    <div style="color: #c8c8c8; font-size: 0.88rem; line-height: 1.6; margin-bottom: 16px;
+                padding: 10px 14px; background: rgba(255,255,255,0.04); border-radius: 4px;">
+        {mult_explain}
+    </div>
+    <div class="analysis-text" style="margin-bottom: 16px;">{conclusion_main}</div>
+    <div style="border-left: 3px solid {risk_verdict_color}; padding: 8px 14px;
+                font-family: 'Courier Prime', monospace; font-size: 0.84rem; color: #bbb; border-radius: 2px;">
+        &#128269;&nbsp;<strong style="color: {risk_verdict_color};">{T('WATCH FOR:', 'THEO DOI:')}</strong>&nbsp;{conclusion_watch}
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+if divergence_alert:
+    st.markdown(f"""
+    <div style="border: 2px solid #FF5F1F; background: rgba(255,95,31,0.08);
+                padding: 15px 20px; border-radius: 6px; margin: 6px 0 20px 0;">
+        <div style="color: #FF8C42; font-size: 0.82rem; font-weight: 700;
+                    font-family: 'Courier Prime', monospace; letter-spacing: 1px; margin-bottom: 6px;">
+            &#9888;&nbsp;{T('CROSS-PLANE SIGNAL', 'TIN HIEU CHEO MAT PHANG')}
+        </div>
+        <div style="color: #FFB088; font-size: 0.88rem; line-height: 1.6;">{divergence_alert}</div>
     </div>
     """, unsafe_allow_html=True)
 

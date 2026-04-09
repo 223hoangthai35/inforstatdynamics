@@ -13,7 +13,8 @@
       "Bash(python validation/garch_forecast_eval.py)",
       "Bash(python -m pip install arch)",
       "Bash(python -c \"import ast; ast.parse\\(open\\('dashboard.py'\\).read\\(\\)\\); print\\('OK'\\)\")",
-      "Bash(python docs/generate_readme_images.py)"
+      "Bash(python docs/generate_readme_images.py)",
+      "Bash(python -)"
     ]
   }
 }
