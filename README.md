@@ -279,14 +279,16 @@ LAYER 4 — CONDITIONAL VOLATILITY ENGINE
     Stochastic: 1.0x  |  Transitional: 1.4x  |  Deterministic: 2.2x
   Output: sigma_daily_pct, sigma_annual_pct, ES_5pct, ES_5pct_adjusted
 
-LAYER 5 — TRI-VECTOR COMPOSITE RISK SCORE
-  agent_orchestrator.py  calc_composite_risk_score()
-  V1 (40%): WPE, |SPE_Z|          — price structural fragility
-  V2 (40%): Vol_SampEn, |Vol_Global_Z|, Vol_Shannon — liquidity structure
-  V3 (20%): Cross-sectional entropy / 100, MFI      — market breadth
-  MinMaxScaler [0,1] per vector -> weighted sum x 100
-  Rolling 504-day P75/P90 thresholds -> STABLE / ELEVATED / CRITICAL
-  Output: composite score 0-100, alert level
+LAYER 5 — VERDICT MATRIX (Regime-Aware Risk Classification)
+  dashboard.py  (inline logic, post-GARCH)
+  Combines sigma_adjusted level with price regime in a 3×4 matrix:
+    Stochastic + any sigma  -> ELEVATED VOLATILITY (yellow) at most
+    Transitional + elevated -> HIGH RISK (orange)
+    Deterministic + low     -> STRUCTURAL WARNING (orange) — calm-before-storm
+    Deterministic + high    -> EXTREME RISK (red)
+  Prevents sigma threshold alone from mislabeling liquidity spikes as systemic crises.
+  Fallback when GARCH unavailable: calc_composite_risk_score() entropy aggregate (0-100)
+  Output: risk_verdict, risk_verdict_color, mult_explain
 
 LAYER 6 — AI EXPLANATION LAYER
   agent_orchestrator.py  ReAct loop (Claude API)
@@ -300,8 +302,8 @@ LAYER 6 — AI EXPLANATION LAYER
 skills/data_skill.py  ->  skills/quant_skill.py  ->  skills/ds_skill.py
      LAYER 1                    LAYER 2                   LAYER 3
                                      |
-                           agent_orchestrator.py
-                           LAYER 4 + 5 + 6 (ReAct)
+                           agent_orchestrator.py + dashboard.py
+                           LAYER 4 + 5 + 6 (ReAct + Verdict Matrix)
                                      |
                                dashboard.py
                            Streamlit + Plotly UI
@@ -380,7 +382,7 @@ The system is designed as a market-agnostic entropy surveillance engine. VNINDEX
 | Component | What changes | What stays the same |
 |:----------|:-------------|:--------------------|
 | Data source | `data_skill.py` — replace vnstock with Bloomberg/Reuters/yfinance | OHLCV schema |
-| Regime multipliers | 1.0 / 1.4 / 2.2 calibrated on VNINDEX tail behavior | Vector weights 40/40/20 |
+| Regime multipliers | 1.0 / 1.4 / 2.2 calibrated on VNINDEX tail behavior | GARCH model specification |
 | GARCH fit | Refits on new market's return distribution automatically | Model specification |
 | VN30 breadth | Replace with S&P 500 constituents, FTSE 100, etc. | Eigenvalue decomposition logic |
 
