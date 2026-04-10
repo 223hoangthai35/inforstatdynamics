@@ -258,7 +258,7 @@ $$r = 0.2 \times \sigma_{\text{window}}$$
 
 The feature fed into the GMM is the rolling Z-score:
 
-$$\text{SPE\_Z}_t = \frac{\text{SampEn}_t - \bar{\mu}_t}{\bar{\sigma}_t}$$
+$$\text{SPE}_{Z,t} = \frac{\text{SampEn}_t - \bar{\mu}_t}{\bar{\sigma}_t}$$
 
 **Parameters:** $m=2$, $r=0.2\,\sigma$, window $= 60$ days.
 
@@ -278,7 +278,7 @@ where $p_i$ is the probability mass in bin $i$ of the discretized volume histogr
 
 ### GMM Regime Classifier
 
-Full-covariance Gaussian Mixture Model with $k=3$ components fitted on $\mathbf{x} = [\text{WPE},\, \text{SPE\_Z}]^\top$:
+Full-covariance Gaussian Mixture Model with $k=3$ components fitted on $\mathbf{x} = [\text{WPE},\, \text{SPE}_Z]^\top$:
 
 $$p(\mathbf{x}) = \sum_{k=1}^{3} \pi_k\; \mathcal{N}\!\left(\mathbf{x} \mid \boldsymbol{\mu}_k,\, \boldsymbol{\Sigma}_k\right)$$
 
@@ -289,7 +289,7 @@ Each component has its own mean $\boldsymbol{\mu}_k \in \mathbb{R}^2$ and free c
 | $k$ (components) | 3 | Three phases: ordered / transition / disordered |
 | Covariance type | Full | Discovers true geometric structure of entropy distributions |
 | `n_init` | 10 | Multiple restarts to avoid local optima |
-| Preprocessing | None (Plane 1) | Raw $[\text{WPE},\, \text{SPE\_Z}]$ — natural scale carries physical meaning |
+| Preprocessing | None (Plane 1) | Raw $[\text{WPE},\, \text{SPE}_Z]$ — natural scale carries physical meaning |
 | Preprocessing | Yeo-Johnson (Plane 2) | Right-skewed volume features require normalization before GMM |
 
 ---
