@@ -162,11 +162,17 @@ def run_event_study(
 
     # ------------------------------------------------------------------
     # Bootstrap null distribution: random flip dates uniform on business days.
+    # NOTE: pd.Series([Timestamp]).astype('int64') unit is environment-
+    # dependent (microseconds in pandas 2.x, nanoseconds in older builds);
+    # casting through datetime64[D] makes the day-index conversion explicit
+    # and unit-independent.
     # ------------------------------------------------------------------
     rng = np.random.default_rng(seed)
     biz_days = pd.date_range(flip_idx.iloc[0], flip_idx.iloc[-1], freq="B")
-    biz_int = biz_days.astype("int64").to_numpy() // 10**9 // 86_400  # day index
-    event_int = np.sort(event_idx.astype("int64").to_numpy() // 10**9 // 86_400)
+    biz_int = biz_days.values.astype("datetime64[D]").astype("int64")
+    event_int = np.sort(
+        event_idx.values.astype("datetime64[D]").astype("int64")
+    )
 
     null_precisions = np.empty(n_bootstrap, dtype=np.float64)
     for i in range(n_bootstrap):
