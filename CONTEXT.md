@@ -67,6 +67,7 @@ NOT a refutation of v1's Entropy Paradox.
 | T2 cross-market flip rate  | REFORMULATED   | VN/SPX = 0.82x in all panels — opposite of predicted dir  |
 | T3 shuffle test            | **PASS**       | observed 7.77 vs null 118.36 flips/yr, p<1e-4 STRUCTURED  |
 | T-D regime duration        | NEW PATTERN    | Transitional Dominance falsifies (A)/(B)/(C) interpretations |
+| T4 robustness              | **PASS**       | p(Tra) ∈ {66.1%, 67.8%, 68.8%} across 3 hysteresis configs — structural |
 
 Raw JSON results: [validation/results/](validation/results/).
 
@@ -159,6 +160,12 @@ band (achieves ~7.8/yr). Calibration is in
     starting 2022-01-01. The COVID-19 shock (March 2020) is in the
     unlabelable region — explicitly disclosed in T2 results.
 
+  - **Transitional Dominance is a structural property of VNINDEX.**
+    Confirmed by T4 robustness: p(Tra) varies only 2.7 pp across three
+    hysteresis configurations spanning loose-to-tight filter
+    aggressiveness. Treat p(Tra) ≈ 67% on VNINDEX as a market
+    invariant, not a parameter-dependent quantity.
+
 ---
 
 ## 8. Scripts you will likely need
@@ -172,6 +179,7 @@ band (achieves ~7.8/yr). Calibration is in
     `python validation/cross_market_flip_rate.py` (T2)
     `python validation/shuffle_test.py` (T3)
     `python validation/regime_duration.py` (T-D)
+    `python validation/transitional_dominance_robustness.py` (T4)
 
 All validation scripts memoise the GMM pipeline per `(market, start, end)`
 via [scripts/extract_flip_dates.py](scripts/extract_flip_dates.py), so

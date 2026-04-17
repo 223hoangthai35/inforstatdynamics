@@ -168,6 +168,23 @@ market: each macro shock nudges the system out of and back into the
 Transitional band rather than driving a clean Deterministic-to-
 Stochastic-and-back excursion.
 
+**Robustness check (T4).** To verify that Transitional Dominance is a
+structural property of VNINDEX rather than an artifact of the specific
+hysteresis parameterisation the filter was calibrated to, we re-applied
+two alternative configurations to the identical fitted GMM:
+*Config B* (looser: delta_hard=0.50, delta_soft=0.30, t_persist=6) and
+*Config C* (tighter: delta_hard=0.70, delta_soft=0.40, t_persist=10),
+alongside the production *Config A* (delta_hard=0.60, delta_soft=0.35,
+t_persist=8). The label-share distribution is invariant: p(Det) varies
+across {25.7%, 26.2%, 24.9%}, p(Tra) across {67.8%, 66.1%, 68.8%}, and
+p(Sto) across {6.5%, 7.7%, 6.4%} -- each within ~1-3 percentage points
+of the production values. Filter aggressiveness moves the *timing* of
+transitions (annualised flip rate 6.76 -- 11.77 across the three
+configs; T_tra 40 -- 72 days) but not the *share* of bars in each
+regime. Transitional Dominance is therefore a structural feature of
+the VNINDEX entropy plane, not a calibration artifact. Detailed
+per-config results in [validation/results/transitional_dominance_robustness.json](../validation/results/transitional_dominance_robustness.json).
+
 ## 5.6.5 Synthesis with Paper v1's Entropy Paradox
 
 Paper v1 documented the Entropy Paradox: deterministic-regime return
@@ -227,5 +244,6 @@ at regime-average volatility -- exactly where the V4 Lift gap appears.
   - [validation/cross_market_flip_rate.py](../validation/cross_market_flip_rate.py) (T2)
   - [validation/shuffle_test.py](../validation/shuffle_test.py) (T3)
   - [validation/regime_duration.py](../validation/regime_duration.py) (T-D, this section's discriminator)
+  - [validation/transitional_dominance_robustness.py](../validation/transitional_dominance_robustness.py) (T4 robustness check)
   - [validation/events_discovered_posthoc.md](../validation/events_discovered_posthoc.md) (post-hoc cluster log)
-  - [validation/results/](../validation/results/) (raw JSON results for all five tests)
+  - [validation/results/](../validation/results/) (raw JSON results for all six tests)

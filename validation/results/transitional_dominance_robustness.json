@@ -1,0 +1,90 @@
+{
+  "market": "VNINDEX",
+  "data_window": [
+    "2020-01-01",
+    "2026-04-17"
+  ],
+  "common_window_start": "2022-01-01",
+  "common_window_end": "2026-04-17",
+  "configs": {
+    "A_current": {
+      "delta_hard": 0.6,
+      "delta_soft": 0.35,
+      "t_persist": 8
+    },
+    "B_looser": {
+      "delta_hard": 0.5,
+      "delta_soft": 0.3,
+      "t_persist": 6
+    },
+    "C_tighter": {
+      "delta_hard": 0.7,
+      "delta_soft": 0.4,
+      "t_persist": 10
+    }
+  },
+  "rows": [
+    {
+      "config_name": "A_current",
+      "config": {
+        "delta_hard": 0.6,
+        "delta_soft": 0.35,
+        "t_persist": 8
+      },
+      "n_bars_common": 1006,
+      "n_segments": 32,
+      "flips_per_year": 7.7654075546719685,
+      "p_det": 0.25745526838966204,
+      "p_tra": 0.6779324055666004,
+      "p_sto": 0.06461232604373758,
+      "T_det_days": 34.10353535353536,
+      "T_tra_days": 61.738591269841265,
+      "T_sto_days": 18.82936507936508,
+      "overall_mean_days": 45.5344742063492
+    },
+    {
+      "config_name": "B_looser",
+      "config": {
+        "delta_hard": 0.5,
+        "delta_soft": 0.3,
+        "t_persist": 6
+      },
+      "n_bars_common": 1006,
+      "n_segments": 48,
+      "flips_per_year": 11.773359840954274,
+      "p_det": 0.2624254473161034,
+      "p_tra": 0.6610337972166997,
+      "p_sto": 0.07654075546719682,
+      "T_det_days": 23.898809523809522,
+      "T_tra_days": 40.13310185185185,
+      "T_sto_days": 13.940972222222221,
+      "overall_mean_days": 30.356316137566136
+    },
+    {
+      "config_name": "C_tighter",
+      "config": {
+        "delta_hard": 0.7,
+        "delta_soft": 0.4,
+        "t_persist": 10
+      },
+      "n_bars_common": 1006,
+      "n_segments": 28,
+      "flips_per_year": 6.763419483101392,
+      "p_det": 0.2485089463220676,
+      "p_tra": 0.6878727634194831,
+      "p_sto": 0.0636182902584493,
+      "T_det_days": 40.2336860670194,
+      "T_tra_days": 71.59297052154196,
+      "T_sto_days": 18.53968253968254,
+      "overall_mean_days": 52.03939909297052
+    }
+  ],
+  "summary": {
+    "p_tra_min": 0.6610337972166997,
+    "p_tra_max": 0.6878727634194831,
+    "p_tra_range": 0.026838966202783365,
+    "T_tra_min_days": 40.13310185185185,
+    "T_tra_max_days": 71.59297052154196,
+    "T_tra_range_days": 31.45986866969011
+  }
+}
