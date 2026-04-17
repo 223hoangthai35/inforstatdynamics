@@ -191,6 +191,10 @@ def run_event_study(
         p_value_vs_random=p_value,
         null_mean_precision=float(null_precisions.mean()),
         null_p95_precision=float(np.percentile(null_precisions, 95)),
+        tolerance_days=tolerance_days,
+        n_bootstrap=n_bootstrap,
+        seed=seed,
+        event_list_size=len(events),
     )
 
 
