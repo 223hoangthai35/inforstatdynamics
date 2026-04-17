@@ -68,8 +68,13 @@ def fit_garch_x(df: pd.DataFrame) -> dict:
         denom = (roll_max - roll_min).replace(0, 1e-8)
         return ((series - roll_min) / denom).clip(0, 1)
 
-    df_valid["H_price"] = rolling_minmax(H_price_raw).shift(1)  # lag 1
-    df_valid["H_volume"] = rolling_minmax(H_vol_raw).shift(1)   # lag 1
+    # lag 1 — entropy at time t is already a function of returns up to t,
+    # so feeding H_t into σ²_t would create circular look-ahead. We use
+    # H_{t-1} → σ²_t. The variance equation in the variance-equation block
+    # of arch's GARCH-X is documented to apply x_t to σ²_t; we explicitly
+    # shift the exog so x_t (post-shift) carries entropy from t-1.
+    df_valid["H_price"] = rolling_minmax(H_price_raw).shift(1)
+    df_valid["H_volume"] = rolling_minmax(H_vol_raw).shift(1)
     df_valid = df_valid.dropna(subset=["H_price", "H_volume"])
 
     # 2. Log returns (%)

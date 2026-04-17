@@ -68,9 +68,25 @@ Volume flow structure reveals three liquidity regimes:
 
 The regime classification overlaid on VNINDEX price history (2020–2026) demonstrates how entropy regimes align with market events. Note that Deterministic (red) periods coincide with both sharp rallies and sharp declines — entropy measures structural coordination, not direction.
 
-### Conditional Volatility (GARCH)
+### Conditional Volatility (GARCH-X) — Primary Risk Engine
 
-GARCH(1,1) provides the conditional volatility backbone, with entropy features tested as exogenous variables (GARCH-X). Filtered Historical Simulation computes Expected Shortfall (ES 5%) without assuming Gaussian tails.
+GARCH-X(1,1) is the **primary risk pipeline** in v7.0+. The conditional variance equation extends the base GARCH(1,1) with lagged, MinMaxScaled entropy features ($\mathbf{z}_{t-1}$) as exogenous regressors over a 504-day rolling window. Each exog coefficient is statistically pruned at $\alpha = 0.10$; surviving entropy variables enter the variance equation directly. Filtered Historical Simulation computes Expected Shortfall (ES 5%) without assuming Gaussian tails. The σ output is then amplified by a regime stress multiplier (1.0× / 1.4× / 2.2×) and combined with the price regime label in the Verdict Matrix to produce the final risk classification.
+
+**Lag-1 enforcement**: All entropy exog features are shifted by one trading day before fitting, so $\sigma_t$ depends only on entropy from $t{-}1$ or earlier — eliminating circular look-ahead between the entropy classifier and the volatility model.
+
+#### Fallback Mechanism — Tri-Vector Composite Risk Score
+
+When GARCH-X cannot be fitted (insufficient history: < 120 trading days, or `arch` library unavailable), the system falls back to a deterministic entropy-aggregate score implemented in `agent_orchestrator.calc_composite_risk_score()`. This is **not** the primary path; it exists purely to keep the dashboard operational during cold-start or degraded-dependency conditions.
+
+The fallback aggregates three risk vectors with fixed weights:
+
+| Vector | Weight | Components |
+|:-------|:-------|:-----------|
+| **V1 — Price Phase** | 0.40 | WPE, \|SPE_Z\| |
+| **V2 — Volume / Liquidity** | 0.40 | Vol_SampEn, \|Vol_Global_Z\|, Vol_Shannon |
+| **V3 — VN30 Breadth** | 0.20 | Corr_Entropy / 100, MFI |
+
+Each component is MinMax-scaled to $[0, 1]$ over a 504-day rolling window, averaged within its vector, then weighted-summed and rescaled to a 0–100 score. Thresholds at the rolling P75 / P90 quantiles map the score to STABLE / ELEVATED / CRITICAL labels. This path is intentionally simple and audit-friendly — it surfaces structural risk even when the conditional-volatility engine is unavailable.
 
 ### AI Explanation Layer
 
