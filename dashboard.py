@@ -429,6 +429,25 @@ def load_and_compute_data(start_date_str, end_date_str, file_bytes=None, file_na
             REGIME_NAMES.get(int(l), str(l)) for l in hyst_labels
         ]
 
+        # Store flip-rate diagnostics for the Technical Details panel and the
+        # Agent's "Regime Stability" sentence. Flip rate measured on the
+        # filtered window, annualized at 252 trading days.
+        raw_int = valid_df["RegimeLabel"].astype(int).values
+        flips_raw = int((np.diff(raw_int) != 0).sum())
+        flips_hyst = int((np.diff(hyst_labels.astype(int)) != 0).sum())
+        n_bars = len(hyst_labels)
+        years = max(n_bars / 252.0, 1e-6)
+        agreement = float((raw_int == hyst_labels.astype(int)).mean())
+        df.attrs["hysteresis_price"] = {
+            "n_bars": n_bars,
+            "flips_raw_per_yr": flips_raw / years,
+            "flips_hyst_per_yr": flips_hyst / years,
+            "agreement": agreement,
+            "delta_hard": HYSTERESIS_DELTA_HARD,
+            "delta_soft": HYSTERESIS_DELTA_SOFT,
+            "t_persist": HYSTERESIS_T_PERSIST,
+        }
+
     df["RegimeName_raw"] = df["RegimeName_raw"].ffill()
     df["RegimeLabel_raw"] = df["RegimeLabel_raw"].ffill()
     df["RegimeName"] = df["RegimeName"].ffill()
@@ -481,6 +500,24 @@ def load_and_compute_data(start_date_str, end_date_str, file_bytes=None, file_na
         df.loc[vol_valid.index, "VolRegimeName"] = [
             VOLUME_REGIME_NAMES.get(int(l), str(l)) for l in vol_hyst_labels
         ]
+
+        vol_raw_int = np.array(
+            [int(name_to_int.get(n, -1)) for n in vol_valid["VolRegimeName_raw"]]
+        )
+        vol_flips_raw = int((np.diff(vol_raw_int) != 0).sum())
+        vol_flips_hyst = int((np.diff(vol_hyst_labels.astype(int)) != 0).sum())
+        n_vbars = len(vol_hyst_labels)
+        vyears = max(n_vbars / 252.0, 1e-6)
+        vagreement = float((vol_raw_int == vol_hyst_labels.astype(int)).mean())
+        df.attrs["hysteresis_volume"] = {
+            "n_bars": n_vbars,
+            "flips_raw_per_yr": vol_flips_raw / vyears,
+            "flips_hyst_per_yr": vol_flips_hyst / vyears,
+            "agreement": vagreement,
+            "delta_hard": HYSTERESIS_DELTA_HARD,
+            "delta_soft": HYSTERESIS_DELTA_SOFT,
+            "t_persist": HYSTERESIS_T_PERSIST,
+        }
 
     df["VolRegimeName_raw"] = df["VolRegimeName_raw"].ffill()
     df["VolRegimeLabel_raw"] = df["VolRegimeLabel_raw"].ffill()
@@ -999,70 +1036,6 @@ fig1.update_xaxes(rangeslider_visible=False)
 fig1.update_yaxes(title_text="VNIndex Price", row=1, col=1, showgrid=True, gridcolor=_plotly_grid)
 fig1.update_yaxes(title_text="WPE Entropy", row=2, col=1, showgrid=True, gridcolor=_plotly_grid)
 st.plotly_chart(fig1, use_container_width=True)
-
-# ==============================================================================
-# REGIME LABEL TIMELINE -- RAW vs HYSTERESIS-FILTERED
-# Visualize what the Schmitt-trigger hysteresis is suppressing on Plane 1.
-# ==============================================================================
-if "RegimeName_raw" in df.columns and df["RegimeName_raw"].notna().any():
-    st.markdown(f"**{T('REGIME LABEL TIMELINE — Raw GMM vs Hysteresis-Filtered', 'TIMELINE NHÃN REGIME — GMM Thô vs Sau Hysteresis')}**")
-    st.caption(T(
-        f"Schmitt trigger: delta_hard={HYSTERESIS_DELTA_HARD:.2f}, delta_soft={HYSTERESIS_DELTA_SOFT:.2f}, t_persist={HYSTERESIS_T_PERSIST}. "
-        "Calibrated post-2020 on VNINDEX. Hysteresis (top row) suppresses single-bar flicker that the raw GMM (bottom row) emits.",
-        f"Schmitt trigger: delta_hard={HYSTERESIS_DELTA_HARD:.2f}, delta_soft={HYSTERESIS_DELTA_SOFT:.2f}, t_persist={HYSTERESIS_T_PERSIST}. "
-        "Calibrated trên VNINDEX sau 2020. Hysteresis (hàng trên) lọc đi nhiễu một-phiên mà GMM thô (hàng dưới) phát ra.",
-    ))
-
-    label_to_int = {"Stochastic": 0, "Transitional": 1, "Deterministic": 2}
-    int_to_color = {
-        0: "rgba(0, 255, 65, 0.85)",
-        1: "rgba(255, 215, 0, 0.85)",
-        2: "rgba(255, 49, 49, 0.85)",
-    }
-    timeline_df = df.dropna(subset=["RegimeName", "RegimeName_raw"]).copy()
-    if not timeline_df.empty:
-        timeline_df["_hyst_int"] = timeline_df["RegimeName"].map(label_to_int).fillna(-1).astype(int)
-        timeline_df["_raw_int"] = timeline_df["RegimeName_raw"].map(label_to_int).fillna(-1).astype(int)
-
-        n_flips_raw = int((timeline_df["_raw_int"].diff().fillna(0) != 0).sum())
-        n_flips_hyst = int((timeline_df["_hyst_int"].diff().fillna(0) != 0).sum())
-        years = max(len(timeline_df) / 252.0, 1e-6)
-        st.caption(T(
-            f"Flips/yr — raw: {n_flips_raw / years:.1f} | filtered: {n_flips_hyst / years:.1f} "
-            f"(over {len(timeline_df)} bars / ~{years:.1f} years).",
-            f"Số lần đổi nhãn/năm — thô: {n_flips_raw / years:.1f} | đã lọc: {n_flips_hyst / years:.1f} "
-            f"(trên {len(timeline_df)} phiên / ~{years:.1f} năm).",
-        ))
-
-        fig_tl = make_subplots(
-            rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06,
-            row_heights=[0.5, 0.5],
-            subplot_titles=(T("Hysteresis-Filtered (production)", "Sau hysteresis (production)"),
-                            T("Raw GMM Posteriors", "GMM thô")),
-        )
-
-        for row_idx, col_int in [(1, "_hyst_int"), (2, "_raw_int")]:
-            shifts = timeline_df.index[timeline_df[col_int].diff().fillna(0) != 0].tolist()
-            if not shifts or shifts[0] != timeline_df.index[0]:
-                shifts = [timeline_df.index[0]] + shifts
-            for i, start in enumerate(shifts):
-                end = shifts[i + 1] if i + 1 < len(shifts) else timeline_df.index[-1]
-                lbl_int = int(timeline_df.loc[start, col_int])
-                color = int_to_color.get(lbl_int, "rgba(128,128,128,0.4)")
-                fig_tl.add_vrect(
-                    x0=start, x1=end, fillcolor=color, opacity=1.0,
-                    layer="below", line_width=0, row=row_idx, col=1,
-                )
-
-        fig_tl.update_yaxes(showticklabels=False, range=[0, 1], row=1, col=1)
-        fig_tl.update_yaxes(showticklabels=False, range=[0, 1], row=2, col=1)
-        fig_tl.update_layout(
-            template=_plotly_template, height=260,
-            plot_bgcolor=_plotly_plot_bg, paper_bgcolor=_plotly_paper_bg,
-            font=dict(color=_plotly_font_color),
-            margin=dict(l=20, r=20, b=20, t=40), showlegend=False,
-        )
-        st.plotly_chart(fig_tl, use_container_width=True)
 
 # --- GARCH-X Conditional Volatility Overlay ---
 if _garch_ok and "Cond_Vol" in df.columns:
@@ -1751,6 +1724,28 @@ if tail_para:
     """, unsafe_allow_html=True)
 
 # === CONCLUSION CARD ===
+_hp = df.attrs.get("hysteresis_price")
+if _hp:
+    _raw_fy = _hp["flips_raw_per_yr"]
+    _hyst_fy = _hp["flips_hyst_per_yr"]
+    _suppr = max(0.0, _raw_fy - _hyst_fy)
+    stability_line_html = (
+        '<div style="color: #9aa0a6; font-size: 0.82rem; font-style: italic; '
+        'margin-bottom: 12px; font-family: \'Courier Prime\', monospace;">'
+        f'&#9881;&nbsp;{T("Regime stability", "Tính ổn định của regime")}: '
+        f'{T("displayed label is hysteresis-filtered", "nhãn hiển thị đã qua bộ lọc hysteresis")} '
+        f'(&Delta;<sub>hard</sub>={HYSTERESIS_DELTA_HARD:.2f}, '
+        f'&Delta;<sub>soft</sub>={HYSTERESIS_DELTA_SOFT:.2f}, '
+        f't<sub>persist</sub>={HYSTERESIS_T_PERSIST}). '
+        f'{T("Filtered flip rate", "Tần suất đổi nhãn đã lọc")}: '
+        f'<strong>{_hyst_fy:.1f} {T("flips/yr", "lần/năm")}</strong> '
+        f'({T("raw", "thô")}: {_raw_fy:.1f}, '
+        f'{T("suppressed", "đã khử nhiễu")}: {_suppr:.1f}).'
+        '</div>'
+    )
+else:
+    stability_line_html = ""
+
 st.markdown(f"""
 <div class="analysis-card">
     <div class="analysis-card-title">{T('CONCLUSION', 'KET LUAN')}</div>
@@ -1763,6 +1758,7 @@ st.markdown(f"""
         {mult_explain}
     </div>
     <div class="analysis-text" style="margin-bottom: 16px;">{conclusion_main}</div>
+    {stability_line_html}
     <div style="border-left: 3px solid {risk_verdict_color}; padding: 8px 14px;
                 font-family: 'Courier Prime', monospace; font-size: 0.84rem; color: #bbb; border-radius: 2px;">
         &#128269;&nbsp;<strong style="color: {risk_verdict_color};">{T('WATCH FOR:', 'THEO DOI:')}</strong>&nbsp;{conclusion_watch}
@@ -1808,6 +1804,34 @@ with st.expander(T("Technical Details (for quant analysts)", "Chi tiet Ky thuat 
     else:
         st.info(T("GARCH model not available. Technical details require 120+ days of data.",
                    "Mo hinh GARCH khong kha dung. Chi tiet ky thuat can 120+ ngay du lieu."))
+
+    hyst_p = df.attrs.get("hysteresis_price")
+    hyst_v = df.attrs.get("hysteresis_volume")
+    if hyst_p or hyst_v:
+        st.markdown("---")
+        st.markdown(f"**{T('Hysteresis Post-Filter (Schmitt trigger over GMM posteriors)', 'Bộ lọc Hysteresis (Schmitt trigger trên posteriors GMM)')}**")
+        st.caption(T(
+            f"Parameters: delta_hard={HYSTERESIS_DELTA_HARD:.2f}, delta_soft={HYSTERESIS_DELTA_SOFT:.2f}, t_persist={HYSTERESIS_T_PERSIST}. "
+            "Calibrated post-2020 on VNINDEX — target 4-10 flips/yr.",
+            f"Tham số: delta_hard={HYSTERESIS_DELTA_HARD:.2f}, delta_soft={HYSTERESIS_DELTA_SOFT:.2f}, t_persist={HYSTERESIS_T_PERSIST}. "
+            "Hiệu chuẩn trên VNINDEX sau 2020 — mục tiêu 4-10 lần đổi nhãn/năm.",
+        ))
+        rows = []
+        if hyst_p:
+            rows.append(("Plane 1 (Price)",
+                         hyst_p["n_bars"], hyst_p["flips_raw_per_yr"],
+                         hyst_p["flips_hyst_per_yr"], hyst_p["agreement"]))
+        if hyst_v:
+            rows.append(("Plane 2 (Volume)",
+                         hyst_v["n_bars"], hyst_v["flips_raw_per_yr"],
+                         hyst_v["flips_hyst_per_yr"], hyst_v["agreement"]))
+        table_md = (
+            "| Plane | Bars | Raw flips/yr | Filtered flips/yr | Bar agreement |\n"
+            "| :--- | ---: | ---: | ---: | ---: |\n"
+        )
+        for plane, n, fr, fh, ag in rows:
+            table_md += f"| {plane} | {n} | {fr:.2f} | {fh:.2f} | {ag*100:.1f}% |\n"
+        st.markdown(table_md)
 
 
 # ==============================================================================

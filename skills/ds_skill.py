@@ -123,16 +123,60 @@ class HysteresisGMMWrapper:
     def _semantic(self, cluster_idx: int) -> int:
         return self._label_map.get(int(cluster_idx), int(cluster_idx))
 
-    def _posteriors_semantic(self, x_row: np.ndarray) -> np.ndarray:
-        """Compute posterior probability per SEMANTIC label (not raw cluster)."""
-        gmm = self._gmm()
-        proba_raw = gmm.predict_proba(x_row.reshape(1, -1))[0]  # (n_clusters,)
-        n_labels = max(self._label_map.values(), default=len(proba_raw) - 1) + 1 \
-            if self._label_map else len(proba_raw)
-        proba_sem = np.zeros(int(n_labels), dtype=np.float64)
-        for cluster_idx, p in enumerate(proba_raw):
-            proba_sem[self._semantic(cluster_idx)] += p
+    def _aggregate_semantic(self, proba_raw: np.ndarray) -> np.ndarray:
+        """
+        Aggregate raw cluster posteriors into semantic-label posteriors.
+        Accepts (n_clusters,) for a single bar or (T, n_clusters) for a batch.
+        """
+        proba_raw = np.atleast_2d(proba_raw)  # (T, n_clusters)
+        n_clusters = proba_raw.shape[1]
+        if self._label_map:
+            n_labels = max(self._label_map.values()) + 1
+        else:
+            n_labels = n_clusters
+        proba_sem = np.zeros((proba_raw.shape[0], int(n_labels)), dtype=np.float64)
+        for cluster_idx in range(n_clusters):
+            proba_sem[:, self._semantic(cluster_idx)] += proba_raw[:, cluster_idx]
         return proba_sem
+
+    def _step_with_proba(self, proba: np.ndarray) -> int:
+        """State-machine core; takes pre-computed semantic posteriors."""
+        top_label = int(np.argmax(proba))
+
+        if self.held_label is None:
+            self.held_label = top_label
+            self.pending_label = None
+            self.pending_count = 0
+            return self.held_label
+
+        if top_label == self.held_label:
+            self.pending_label = None
+            self.pending_count = 0
+            return self.held_label
+
+        margin = float(proba[top_label] - proba[self.held_label])
+
+        if margin >= self.delta_hard:
+            self.held_label = top_label
+            self.pending_label = None
+            self.pending_count = 0
+            return self.held_label
+
+        if margin >= self.delta_soft:
+            if self.pending_label == top_label:
+                self.pending_count += 1
+            else:
+                self.pending_label = top_label
+                self.pending_count = 1
+            if self.pending_count >= self.t_persist:
+                self.held_label = top_label
+                self.pending_label = None
+                self.pending_count = 0
+            return self.held_label
+
+        self.pending_label = None
+        self.pending_count = 0
+        return self.held_label
 
     def step(self, x_t: np.ndarray) -> int:
         """
@@ -147,60 +191,28 @@ class HysteresisGMMWrapper:
           5. Else (or candidate changed) -> reset the pending counter.
         """
         x_t = np.asarray(x_t, dtype=np.float64).ravel()
-        proba = self._posteriors_semantic(x_t)
-        top_label = int(np.argmax(proba))
-
-        if self.held_label is None:
-            self.held_label = top_label
-            self.pending_label = None
-            self.pending_count = 0
-            return self.held_label
-
-        if top_label == self.held_label:
-            # Top stayed put — clear any pending flip
-            self.pending_label = None
-            self.pending_count = 0
-            return self.held_label
-
-        margin = float(proba[top_label] - proba[self.held_label])
-
-        if margin >= self.delta_hard:
-            # Hard penetration — flip immediately
-            self.held_label = top_label
-            self.pending_label = None
-            self.pending_count = 0
-            return self.held_label
-
-        if margin >= self.delta_soft:
-            # Soft margin — accumulate persistence
-            if self.pending_label == top_label:
-                self.pending_count += 1
-            else:
-                self.pending_label = top_label
-                self.pending_count = 1
-            if self.pending_count >= self.t_persist:
-                self.held_label = top_label
-                self.pending_label = None
-                self.pending_count = 0
-            return self.held_label
-
-        # Margin too small -- treat as noise, drop pending
-        self.pending_label = None
-        self.pending_count = 0
-        return self.held_label
+        proba_raw = self._gmm().predict_proba(x_t.reshape(1, -1))[0]
+        proba = self._aggregate_semantic(proba_raw)[0]
+        return self._step_with_proba(proba)
 
     def transform(self, X: np.ndarray) -> np.ndarray:
         """
         Apply hysteresis to a (T x n_features) matrix in chronological order.
         Returns a (T,) array of semantic labels. Resets state before processing.
+
+        Performance: posteriors are computed in a SINGLE vectorized
+        predict_proba() call on the full matrix; only the sequential state
+        machine (which has loop-carried dependencies) iterates in Python.
         """
         X = np.asarray(X, dtype=np.float64)
         if X.ndim == 1:
             X = X.reshape(1, -1)
         self.reset()
+        proba_raw = self._gmm().predict_proba(X)            # (T, n_clusters)
+        proba_sem = self._aggregate_semantic(proba_raw)     # (T, n_labels)
         out = np.empty(X.shape[0], dtype=np.int64)
         for i in range(X.shape[0]):
-            out[i] = self.step(X[i])
+            out[i] = self._step_with_proba(proba_sem[i])
         return out
 
 

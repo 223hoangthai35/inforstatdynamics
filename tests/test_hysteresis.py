@@ -21,16 +21,25 @@ from skills.ds_skill import HysteresisGMMWrapper
 
 
 class _StubGMM:
-    """Minimal GMM stub: returns the next pre-canned posterior on each call."""
+    """
+    Minimal GMM stub mirroring sklearn's predict_proba semantics:
+    returns one pre-canned posterior row per input row.
+    Single-row calls advance an internal index (for step()); multi-row calls
+    return the next len(X) rows en bloc (for transform()).
+    """
 
     def __init__(self, posteriors):
-        self.posteriors = list(posteriors)
+        self.posteriors = np.asarray(posteriors, dtype=np.float64)
         self._i = 0
 
     def predict_proba(self, X):
-        p = np.atleast_2d(self.posteriors[self._i])
-        self._i += 1
-        return p
+        X = np.atleast_2d(X)
+        n = X.shape[0]
+        if n == 1:
+            p = self.posteriors[self._i:self._i + 1]
+            self._i += 1
+            return p
+        return self.posteriors[:n]
 
 
 class _StubClassifier:
